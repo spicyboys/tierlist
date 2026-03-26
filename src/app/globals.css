@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  color: #ededed;
+  background: #030712;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+/* Hide UI controls during PNG export */
+[data-exporting="true"] .export-hide {
+  display: none !important;
+}
+
+/* During PNG export: make title flow below the image instead of overlapping */
+[data-exporting="true"] .export-title {
+  position: relative !important;
+  bottom: auto !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  padding-bottom: 10px !important;
+}
+
+[data-exporting="true"] .export-tile {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+[data-exporting="true"] .export-tile .export-img {
+  height: 100px !important;
+  width: 100px !important;
+}

@@ -1,0 +1,9 @@
+name = "tierlist"
+pages_build_output_dir = ".vercel/output/static"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tierlist-db"
+database_id = "d7315850-f2fc-4062-b4ee-d75fdc0dd284"
