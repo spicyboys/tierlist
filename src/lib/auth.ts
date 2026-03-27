@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 
 const JWT_SECRET = "tierlist-jwt-secret-2024"; // In production, use env var
 const COOKIE_NAME = "tierlist_auth";
@@ -152,17 +153,16 @@ export function authCookie(token: string): string {
 
 // --- Get authenticated user from request ---
 
-export async function getAuthUser(
-  req: NextRequest
-): Promise<{ id: string; username: string } | null> {
-  const cookie = req.cookies.get(COOKIE_NAME);
+export async function getAuthUser(): Promise<{ id: string; username: string } | null> {
+  const cookieStore = await cookies();
+
+  const cookie = cookieStore.get(COOKIE_NAME);
   if (!cookie?.value) return null;
 
   const payload = await verifyJWT(cookie.value);
   if (!payload) return null;
 
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
   const user = await db
     .select({ id: schema.users.id, username: schema.users.username })
     .from(schema.users)

@@ -1,11 +1,9 @@
-export const runtime = "edge";
-
 import { NextRequest, NextResponse } from "next/server";
-import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, and, asc } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { getAuthUser } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 const generateId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 25);
 
@@ -76,7 +74,7 @@ async function checkAuthorization(
   id: string
 ): Promise<boolean> {
   // Check auth cookie first
-  const user = await getAuthUser(req);
+  const user = await getAuthUser();
   if (!user) {
     return false;
   }
@@ -93,8 +91,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
   const tierList = await getTierListFull(db, id);
 
   if (!tierList) {
@@ -109,8 +106,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
 
   const authorized = await checkAuthorization(req, db, id);
   if (!authorized) {
@@ -188,6 +184,8 @@ export async function PUT(
   }
 
   const updated = await getTierListFull(db, id);
+
+  revalidatePath('/dashboard');
   return NextResponse.json(updated);
 }
 
@@ -196,8 +194,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
 
   const authorized = await checkAuthorization(req, db, id);
   if (!authorized) {

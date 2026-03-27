@@ -1,7 +1,4 @@
-export const runtime = "edge";
-
 import { NextRequest, NextResponse } from "next/server";
-import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 
@@ -10,8 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ code: string }> }
 ) {
   const { code } = await params;
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
 
   const session = await db
     .select()

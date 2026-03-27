@@ -34,6 +34,7 @@ yarn-error.log*
 
 # cloudflare
 .wrangler
+.open-next
 
 # local database
 dev.db

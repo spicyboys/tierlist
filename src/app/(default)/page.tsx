@@ -48,7 +48,6 @@ export default function HomePage() {
         </Link>
       </div>
 
-      <GuildLiveSessions />
 
       <div className="bg-gray-900 rounded-xl p-6 max-w-sm mx-auto">
         <h2 className="text-sm font-medium text-gray-400 mb-3">
@@ -73,6 +72,8 @@ export default function HomePage() {
           </button>
         </div>
       </div>
+
+      <GuildLiveSessions />
     </main>
   );
 }
@@ -94,8 +95,8 @@ function GuildLiveSessions() {
   if (sessions.length === 0) return null;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h2 className="text-xl font-bold mb-4">Active Sessions in Your Guild</h2>
+    <div className="max-w-sm mx-auto px-4 py-8">
+      <h2 className="text-xl font-bold mb-4">Active Sessions</h2>
       <div className="space-y-3">
         {sessions.map((s) => (
           <Link

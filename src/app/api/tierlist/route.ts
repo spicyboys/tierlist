@@ -1,7 +1,4 @@
-export const runtime = "edge";
-
 import { NextRequest, NextResponse } from "next/server";
-import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
@@ -19,7 +16,7 @@ const DEFAULT_TIERS = [
 ];
 
 export async function POST(req: NextRequest) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -28,8 +25,7 @@ export async function POST(req: NextRequest) {
     title: string;
   };
 
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
   const tierListId = generateId();
 
   await db
@@ -59,10 +55,9 @@ export async function POST(req: NextRequest) {
 
 // GET tier lists by IDs (from client localStorage) or by owner
 export async function GET(req: NextRequest) {
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
 
-  const user = await getAuthUser(req);
+  const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

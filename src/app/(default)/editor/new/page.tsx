@@ -60,10 +60,12 @@ export default function NewEditorPage() {
   };
 
   return (
-    <TierListEditor
-      initialData={BLANK_DATA}
-      onSave={handleCreate}
-      canSave={!saving}
-    />
+    <main className="max-w-2xl mx-auto px-4 py-24 text-center">
+      <TierListEditor
+        initialData={BLANK_DATA}
+        onSave={handleCreate}
+        canSave={!saving}
+      />
+    </main>
   );
 }

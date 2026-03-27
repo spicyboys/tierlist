@@ -1,5 +1,3 @@
-export const runtime = "edge";
-
 import { NextRequest, NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
@@ -15,8 +13,7 @@ export async function POST(req: NextRequest) {
     discordGuildId: string | null;
   };
 
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
 
   const tierList = await db
     .select()
@@ -30,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   // Check auth: either owner or password
   let authorized = false;
-  const user = await getAuthUser(req);
+  const user = await getAuthUser();
   if (user && tierList.ownerId === user.id) {
     authorized = true;
   }

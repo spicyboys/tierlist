@@ -1,7 +1,4 @@
-export const runtime = "edge";
-
 import { NextRequest, NextResponse } from "next/server";
-import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, and, asc, gt, sql } from "drizzle-orm";
 import { getAuthUser } from "@/lib/auth";
@@ -13,14 +10,13 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { code } = await params;
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
 
   // Validate session is active
   const session = await db

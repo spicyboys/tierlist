@@ -1,14 +1,18 @@
-import { setupDevPlatform } from "@cloudflare/next-on-pages/next-dev";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
-if (process.env.NODE_ENV === "development") {
-  await setupDevPlatform();
-}
+initOpenNextCloudflareForDev();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["1486864508960899153.discordsays.com"],
+    },
+  },
+  allowedDevOrigins: ["1486864508960899153.discordsays.com"],
 };
 
 export default nextConfig;

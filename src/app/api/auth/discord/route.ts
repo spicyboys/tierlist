@@ -1,7 +1,4 @@
-export const runtime = "edge";
-
 import { NextRequest, NextResponse } from "next/server";
-import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { createJWT, authCookie } from "@/lib/auth";
 
@@ -37,8 +34,7 @@ export async function POST(req: NextRequest) {
     username: string;
   };
 
-  const env = getEnv();
-  const db = getDb(env.DB);
+  const db = getDb();
   await db
     .insert(schema.users)
     .values({
