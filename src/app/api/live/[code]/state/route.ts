@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, and, asc, gt, sql } from "drizzle-orm";
+import { getAuthUser } from "@/lib/auth";
 
 // Users seen within the last 10 seconds are considered online
 const PRESENCE_TIMEOUT_SEC = 10;
@@ -12,6 +13,11 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { code } = await params;
   const env = getEnv();
   const db = getDb(env.DB);
@@ -22,32 +28,30 @@ export async function GET(
     .from(schema.liveSessions)
     .where(
       and(
-        eq(schema.liveSessions.code, code.toUpperCase()),
-        eq(schema.liveSessions.active, true)
+        eq(schema.liveSessions.id, code.toUpperCase()),
       )
     )
     .get();
 
   if (!session) {
-    return NextResponse.json({ error: "Session ended", ended: true }, { status: 404 });
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
   // Handle heartbeat: upsert user presence using INSERT OR REPLACE
-  const userId = req.nextUrl.searchParams.get("userId");
-  const userName = req.nextUrl.searchParams.get("userName");
   const now = Math.floor(Date.now() / 1000);
 
-  if (userId && userName) {
-    // Use raw SQL for proper upsert to avoid race conditions
-    await db.run(sql`
-      INSERT INTO live_session_users (id, session_id, name, last_seen_at)
-      VALUES (${userId}, ${session.id}, ${userName}, ${now})
-      ON CONFLICT(id) DO UPDATE SET
-        last_seen_at = ${now},
-        name = ${userName},
-        session_id = ${session.id}
-    `);
-  }
+  // Use raw SQL for proper upsert to avoid race conditions
+  await db.insert(schema.liveSessionUsers).values({
+    userId: user.id,
+    sessionId: session.id,
+    lastSeenAt: now,
+  }).onConflictDoUpdate({
+    target: [schema.liveSessionUsers.userId, schema.liveSessionUsers.sessionId],
+    set: {
+      lastSeenAt: now,
+      draggingItemId: sql`excluded.dragging_item_id`, // Preserve dragging state if provided
+    },
+  }).run();
 
   // Clean up very old entries (older than 60 seconds)
   const cleanupCutoff = now - 60;
@@ -65,8 +69,8 @@ export async function GET(
   const cutoff = now - PRESENCE_TIMEOUT_SEC;
   const activeUsers = await db
     .select({
-      id: schema.liveSessionUsers.id,
-      name: schema.liveSessionUsers.name,
+      id: schema.liveSessionUsers.userId,
+      username: schema.users.username,
       draggingItemId: schema.liveSessionUsers.draggingItemId,
     })
     .from(schema.liveSessionUsers)
@@ -76,6 +80,7 @@ export async function GET(
         gt(schema.liveSessionUsers.lastSeenAt, cutoff)
       )
     )
+    .innerJoin(schema.users, eq(schema.users.id, schema.liveSessionUsers.userId))
     .all();
 
   // Fetch full tier list state
@@ -124,6 +129,7 @@ export async function GET(
 
   return NextResponse.json({
     id: tierList.id,
+    ownerId: tierList.ownerId,
     title: tierList.title,
     tiers: tiersWithItems,
     items: unsortedItems,

@@ -18,8 +18,7 @@ export async function POST(
     .from(schema.liveSessions)
     .where(
       and(
-        eq(schema.liveSessions.code, code.toUpperCase()),
-        eq(schema.liveSessions.active, true)
+        eq(schema.liveSessions.id, code.toUpperCase()),
       )
     )
     .get();
@@ -50,24 +49,24 @@ export async function POST(
   // Recompute order for all items in the target container
   const targetItems = tierId
     ? await db
-        .select()
-        .from(schema.items)
-        .where(
-          and(eq(schema.items.tierId, tierId), eq(schema.items.isUnsorted, false))
-        )
-        .orderBy(asc(schema.items.order))
-        .all()
+      .select()
+      .from(schema.items)
+      .where(
+        and(eq(schema.items.tierId, tierId), eq(schema.items.isUnsorted, false))
+      )
+      .orderBy(asc(schema.items.order))
+      .all()
     : await db
-        .select()
-        .from(schema.items)
-        .where(
-          and(
-            eq(schema.items.tierListId, session.tierListId),
-            eq(schema.items.isUnsorted, true)
-          )
+      .select()
+      .from(schema.items)
+      .where(
+        and(
+          eq(schema.items.tierListId, session.tierListId),
+          eq(schema.items.isUnsorted, true)
         )
-        .orderBy(asc(schema.items.order))
-        .all();
+      )
+      .orderBy(asc(schema.items.order))
+      .all();
 
   // Place the moved item at the requested position
   const otherItems = targetItems.filter((i) => i.id !== itemId);

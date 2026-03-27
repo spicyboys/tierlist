@@ -5,7 +5,6 @@ import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, and, asc } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
-import { verifyPassword } from "@/lib/password";
 import { getAuthUser } from "@/lib/auth";
 
 const generateId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 25);
@@ -52,13 +51,21 @@ async function getTierListFull(db: ReturnType<typeof getDb>, id: string) {
     .orderBy(asc(schema.items.order))
     .all();
 
+  const liveSession = await db
+    .select()
+    .from(schema.liveSessions)
+    .where(eq(schema.liveSessions.tierListId, id))
+    .get();
+
+  const liveSessionId = liveSession ? liveSession.id : null;
+
   return {
     id: tierList.id,
     title: tierList.title,
-    creatorName: tierList.creatorName,
     ownerId: tierList.ownerId,
     tiers: tiersWithItems,
     items: unsortedItems,
+    liveSessionId,
   };
 }
 
@@ -70,27 +77,15 @@ async function checkAuthorization(
 ): Promise<boolean> {
   // Check auth cookie first
   const user = await getAuthUser(req);
-  if (user) {
-    const tierList = await db
-      .select()
-      .from(schema.tierLists)
-      .where(eq(schema.tierLists.id, id))
-      .get();
-    if (tierList?.ownerId === user.id) return true;
+  if (!user) {
+    return false;
   }
-
-  // Fall back to password check
-  const password = req.headers.get("X-Edit-Password");
-  if (!password) return false;
-
   const tierList = await db
     .select()
     .from(schema.tierLists)
     .where(eq(schema.tierLists.id, id))
     .get();
-
-  if (!tierList) return false;
-  return verifyPassword(password, tierList.editPasswordHash);
+  return tierList?.ownerId === user.id;
 }
 
 export async function GET(

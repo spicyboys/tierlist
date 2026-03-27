@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `live_sessions_tier_list_id_unique` ON `live_sessions` (`tier_list_id`);

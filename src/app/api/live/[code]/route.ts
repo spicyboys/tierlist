@@ -18,8 +18,7 @@ export async function GET(
     .from(schema.liveSessions)
     .where(
       and(
-        eq(schema.liveSessions.code, code.toUpperCase()),
-        eq(schema.liveSessions.active, true)
+        eq(schema.liveSessions.id, code.toUpperCase()),
       )
     )
     .get();
@@ -29,7 +28,7 @@ export async function GET(
   }
 
   return NextResponse.json({
-    code: session.code,
+    code: session.id,
     tierListId: session.tierListId,
     active: true,
   });
@@ -45,9 +44,8 @@ export async function DELETE(
   const db = getDb(env.DB);
 
   await db
-    .update(schema.liveSessions)
-    .set({ active: false })
-    .where(eq(schema.liveSessions.code, code.toUpperCase()))
+    .delete(schema.liveSessions)
+    .where(eq(schema.liveSessions.id, code.toUpperCase()))
     .run();
 
   return NextResponse.json({ success: true });

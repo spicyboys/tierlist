@@ -91,7 +91,7 @@ function base64urlDecode(s: string): Uint8Array {
 
 export async function createJWT(payload: {
   userId: string;
-  email: string;
+  username: string;
 }): Promise<string> {
   const header = { alg: "HS256", typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
@@ -114,7 +114,7 @@ export async function createJWT(payload: {
 
 export async function verifyJWT(
   token: string
-): Promise<{ userId: string; email: string } | null> {
+): Promise<{ userId: string; username: string } | null> {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -134,11 +134,11 @@ export async function verifyJWT(
 
     const body = JSON.parse(
       new TextDecoder().decode(base64urlDecode(bodyB64))
-    ) as { userId: string; email: string; exp: number };
+    ) as { userId: string; username: string; exp: number };
 
     if (body.exp < Math.floor(Date.now() / 1000)) return null;
 
-    return { userId: body.userId, email: body.email };
+    return { userId: body.userId, username: body.username };
   } catch {
     return null;
   }
@@ -147,18 +147,14 @@ export async function verifyJWT(
 // --- Cookie helpers ---
 
 export function authCookie(token: string): string {
-  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}`;
-}
-
-export function clearAuthCookie(): string {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
+  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=None; Max-Age=${COOKIE_MAX_AGE}; Domain=${process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID}.discordsays.com; Secure`;
 }
 
 // --- Get authenticated user from request ---
 
 export async function getAuthUser(
   req: NextRequest
-): Promise<{ id: string; email: string; name: string } | null> {
+): Promise<{ id: string; username: string } | null> {
   const cookie = req.cookies.get(COOKIE_NAME);
   if (!cookie?.value) return null;
 
@@ -168,7 +164,7 @@ export async function getAuthUser(
   const env = getEnv();
   const db = getDb(env.DB);
   const user = await db
-    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
+    .select({ id: schema.users.id, username: schema.users.username })
     .from(schema.users)
     .where(eq(schema.users.id, payload.userId))
     .get();

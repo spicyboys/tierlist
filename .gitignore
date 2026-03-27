@@ -50,3 +50,14 @@ test-results/
 next-env.d.ts
 
 /src/generated/prisma
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml

@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { useAuth } from "@/components/AuthProvider";
 
 interface TierListSummary {
   id: string;
@@ -15,22 +13,15 @@ interface TierListSummary {
 }
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, logout } = useAuth();
-  const router = useRouter();
   const [tierLists, setTierLists] = useState<TierListSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
     fetch("/api/tierlist?mine=1")
       .then((res) => res.json() as Promise<TierListSummary[]>)
       .then((data) => setTierLists(data))
       .finally(() => setLoading(false));
-  }, [user, authLoading, router]);
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this tier list?")) return;
@@ -46,7 +37,7 @@ export default function DashboardPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-gray-400">Loading...</div>
@@ -55,22 +46,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-lg font-bold text-white">
-          TierMaker
-        </Link>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">{user?.name}</span>
-          <button
-            onClick={logout}
-            className="text-sm text-gray-500 hover:text-white transition"
-          >
-            Log Out
-          </button>
-        </div>
-      </nav>
-
+    <>
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">My Tier Lists</h1>
@@ -118,6 +94,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

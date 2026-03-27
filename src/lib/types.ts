@@ -15,7 +15,9 @@ export interface TierData {
 
 export interface TierListData {
   id: string;
+  ownerId?: string;
   title: string;
   tiers: TierData[];
   unsortedItems: TierItem[];
+  liveSessionId: string | null;
 }

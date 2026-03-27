@@ -100,9 +100,8 @@ function UnsortedPool({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-[#1a1a2e] min-h-[80px] sm:min-h-[100px] ${
-        isOver ? "bg-white/5" : ""
-      }`}
+      className={`bg-[#1a1a2e] min-h-[80px] sm:min-h-[100px] ${isOver ? "bg-white/5" : ""
+        }`}
     >
       <SortableContext
         items={items.map((i) => i.id)}
@@ -534,6 +533,7 @@ export default function TierListEditor({
           ...item,
           order: i,
         })),
+        liveSessionId: initialData.liveSessionId,
       });
       toast.success("Tier list saved!");
     } catch {

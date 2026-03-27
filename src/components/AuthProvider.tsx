@@ -1,57 +1,88 @@
 "use client";
 
+import { DiscordSDK } from "@discord/embedded-app-sdk";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { User } from "./UserProvider";
 
 interface AuthContextType {
-  user: User | null;
-  loading: boolean;
+  authState: AuthState;
   refresh: () => Promise<void>;
-  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  refresh: async () => {},
-  logout: async () => {},
+  authState: { user: null, loading: true, error: null },
+  refresh: async () => { },
 });
 
 export function useAuth() {
   return useContext(AuthContext);
 }
 
+export const discordSdk = new DiscordSDK(process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!);
+
+async function userFromDiscord(): Promise<User | null> {
+
+  await discordSdk.ready();
+  const { code } = await discordSdk.commands.authorize({
+    client_id: process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!,
+    response_type: 'code',
+    state: '',
+    prompt: 'none',
+    scope: ['identify', 'applications.commands'],
+  });
+
+  // Retrieve an access_token from your application's server
+  const response = await fetch('/api/auth/discord', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code,
+    }),
+  });
+
+  return await response.json() as User;
+}
+
+type AuthState = {
+  user: User
+  loading: false;
+  error: null;
+} | {
+  user: null;
+  loading: true;
+  error: null;
+} | {
+  user: null;
+  loading: false;
+  error: string;
+};
+
+
 export default function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    error: null,
+  });
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me");
-      if (res.ok) {
-        setUser((await res.json()) as User);
-      } else {
-        setUser(null);
+      const user = await userFromDiscord();
+      if (user) {
+        setAuthState({ user, loading: false, error: null });
+        return;
       }
     } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
+      // Ignore errors and just set user to null
     }
-  }, []);
 
-  const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
+    setAuthState({ user: null, loading: false, error: "Failed to fetch user" });
   }, []);
 
   useEffect(() => {
@@ -59,7 +90,7 @@ export default function AuthProvider({
   }, [refresh]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, refresh, logout }}>
+    <AuthContext.Provider value={{ authState, refresh }}>
       {children}
     </AuthContext.Provider>
   );

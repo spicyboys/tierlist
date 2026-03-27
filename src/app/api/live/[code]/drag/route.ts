@@ -4,11 +4,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 import { getDb, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { getAuthUser } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { code } = await params;
   const env = getEnv();
   const db = getDb(env.DB);
@@ -18,8 +24,7 @@ export async function POST(
     .from(schema.liveSessions)
     .where(
       and(
-        eq(schema.liveSessions.code, code.toUpperCase()),
-        eq(schema.liveSessions.active, true)
+        eq(schema.liveSessions.id, code.toUpperCase()),
       )
     )
     .get();
@@ -28,19 +33,19 @@ export async function POST(
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const { userId, itemId } = (await req.json()) as {
-    userId: string;
+  const { itemId } = (await req.json()) as {
     itemId: string | null;
   };
-
-  if (!userId) {
-    return NextResponse.json({ error: "userId required" }, { status: 400 });
-  }
 
   await db
     .update(schema.liveSessionUsers)
     .set({ draggingItemId: itemId || null })
-    .where(eq(schema.liveSessionUsers.id, userId))
+    .where(
+      and(
+        eq(schema.liveSessionUsers.userId, user.id),
+        eq(schema.liveSessionUsers.sessionId, session.id)
+      )
+    )
     .run();
 
   return NextResponse.json({ success: true });

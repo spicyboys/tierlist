@@ -21,8 +21,7 @@ export async function POST(
     .from(schema.liveSessions)
     .where(
       and(
-        eq(schema.liveSessions.code, code.toUpperCase()),
-        eq(schema.liveSessions.active, true)
+        eq(schema.liveSessions.id, code.toUpperCase())
       )
     )
     .get();

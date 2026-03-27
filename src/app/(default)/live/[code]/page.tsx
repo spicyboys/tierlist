@@ -8,33 +8,18 @@ import TierListEditor, { DragIndicator } from "@/components/TierListEditor";
 import { TierListData, TierItem } from "@/lib/types";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { customAlphabet } from "nanoid";
-
-const generateUserId = customAlphabet(
-  "abcdefghijklmnopqrstuvwxyz0123456789",
-  16
-);
-
-// Persist viewer userId so presence survives reloads
-function getOrCreateViewerId(code: string): string {
-  if (typeof window === "undefined") return generateUserId();
-  const key = `viewer_uid_${code}`;
-  const stored = sessionStorage.getItem(key);
-  if (stored) return stored;
-  const id = generateUserId();
-  sessionStorage.setItem(key, id);
-  return id;
-}
+import { useUser } from "@/components/UserProvider";
 
 interface LiveUser {
   id: string;
-  name: string;
+  username: string;
   draggingItemId?: string | null;
 }
 
 function parseTierList(data: Record<string, unknown>): TierListData {
   const tl = data as {
     id: string;
+    ownerId: string;
     title: string;
     tiers: Array<{
       id: string;
@@ -54,9 +39,11 @@ function parseTierList(data: Record<string, unknown>): TierListData {
       imageUrl: string | null;
       order: number;
     }>;
+    liveSessionId: string | null;
   };
   return {
     id: tl.id,
+    ownerId: tl.ownerId,
     title: tl.title,
     tiers: tl.tiers.map((t) => ({
       id: t.id,
@@ -76,6 +63,7 @@ function parseTierList(data: Record<string, unknown>): TierListData {
       imageUrl: i.imageUrl,
       order: i.order,
     })),
+    liveSessionId: tl.liveSessionId,
   };
 }
 
@@ -98,59 +86,39 @@ export default function LiveSessionPage({
   const [data, setData] = useState<TierListData | null>(null);
   const [loading, setLoading] = useState(true);
   const [ended, setEnded] = useState(false);
-  const [userName, setUserName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return sessionStorage.getItem(`viewer_name_${code}`) || "";
-  });
-  const [joined, setJoined] = useState(false);
-  const [userId] = useState(() => getOrCreateViewerId(code));
   const [users, setUsers] = useState<LiveUser[]>([]);
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFingerprintRef = useRef<string>("");
-  const userNameRef = useRef("");
   const isDraggingRef = useRef(false);
-
-  useEffect(() => {
-    userNameRef.current = userName;
-  }, [userName]);
+  const user = useUser();
 
   const pollState = useCallback(async () => {
     try {
-      const p = new URLSearchParams();
-      if (userNameRef.current) {
-        p.set("userId", userId);
-        p.set("userName", userNameRef.current);
-      }
-      const res = await fetch(`/api/live/${code}/state?${p.toString()}`);
+      const res = await fetch(`/api/live/${code}/state`);
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          ended?: boolean;
-        };
-        if (body.ended) {
-          setEnded(true);
-          if (pollRef.current) clearInterval(pollRef.current);
-          return;
+        if (res.status === 404) {
+          if (data !== null) {
+            toast.error("Session ended");
+            setEnded(true);
+          }
         }
-        return;
-      }
-      const state = (await res.json()) as Record<string, unknown> & {
-        active?: boolean;
-        users?: LiveUser[];
-      };
-      if (!state.active) {
-        setEnded(true);
+
         if (pollRef.current) clearInterval(pollRef.current);
         return;
       }
+
+      const state = (await res.json()) as Record<string, unknown> & {
+        users?: LiveUser[];
+      };
 
       // Always update users and drag indicators
       if (state.users) {
         setUsers(state.users);
         const indicators: DragIndicator[] = [];
         for (const u of state.users) {
-          if (u.id !== userId && u.draggingItemId) {
-            indicators.push({ itemId: u.draggingItemId, userName: u.name });
+          if (u.id !== user.id && u.draggingItemId) {
+            indicators.push({ itemId: u.draggingItemId, userName: u.username });
           }
         }
         setDragIndicators(indicators);
@@ -168,11 +136,9 @@ export default function LiveSessionPage({
     } catch {
       // Network error, keep polling
     }
-  }, [code, userId]);
+  }, [code, user.id]);
 
   useEffect(() => {
-    if (!joined) return;
-
     fetch(`/api/live/${code}`)
       .then((res) => {
         if (!res.ok) throw new Error("Session not found");
@@ -181,7 +147,6 @@ export default function LiveSessionPage({
       .then(() => pollState())
       .then(() => {
         setLoading(false);
-        toast.success("Joined live session!");
         pollRef.current = setInterval(pollState, 1000);
       })
       .catch(() => {
@@ -192,10 +157,12 @@ export default function LiveSessionPage({
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [code, router, pollState, joined]);
+  }, [code, router, pollState]);
 
   const handleItemAdded = useCallback(
     async (item: TierItem) => {
+      if (ended) return;
+
       await fetch(`/api/live/${code}/add-item`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -203,11 +170,13 @@ export default function LiveSessionPage({
       });
       await pollState();
     },
-    [code, pollState]
+    [code, pollState, ended]
   );
 
   const handleItemMoved = useCallback(
     async (itemId: string, targetTierId: string | null, newOrder: number) => {
+      if (ended) return;
+
       await fetch(`/api/live/${code}/move-item`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,11 +188,13 @@ export default function LiveSessionPage({
       });
       await pollState();
     },
-    [code, pollState]
+    [code, pollState, ended]
   );
 
   const handleItemRemoved = useCallback(
     async (itemId: string) => {
+      if (ended) return;
+
       await fetch(`/api/live/${code}/remove-item`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -231,11 +202,13 @@ export default function LiveSessionPage({
       });
       await pollState();
     },
-    [code, pollState]
+    [code, pollState, ended]
   );
 
   const handleDragBroadcast = useCallback(
     (itemId: string | null) => {
+      if (ended) return;
+
       if (itemId) {
         isDraggingRef.current = true;
       } else {
@@ -244,62 +217,11 @@ export default function LiveSessionPage({
       fetch(`/api/live/${code}/drag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, itemId }),
+        body: JSON.stringify({ itemId }),
       });
     },
-    [code, userId]
+    [code, ended]
   );
-
-  // Name entry screen
-  if (!joined) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
-        <div className="max-w-sm w-full mx-4">
-          <div className="bg-gray-900 rounded-xl p-6">
-            <h1 className="text-xl font-bold mb-1 text-center">
-              Join Live Session
-            </h1>
-            <p className="text-gray-400 text-sm text-center mb-5">
-              Code: <span className="font-mono text-green-400">{code}</span>
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">
-                Your Name
-              </label>
-              <input
-                type="text"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && userName.trim()) {
-                    sessionStorage.setItem(`viewer_name_${code}`, userName.trim());
-                    setJoined(true);
-                  }
-                }}
-                placeholder="Enter your name"
-                autoFocus
-                className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:border-blue-500 outline-none"
-              />
-            </div>
-            <button
-              onClick={() => {
-                if (!userName.trim()) {
-                  toast.error("Please enter your name");
-                  return;
-                }
-                sessionStorage.setItem(`viewer_name_${code}`, userName.trim());
-                setJoined(true);
-              }}
-              disabled={!userName.trim()}
-              className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-4 py-3 rounded-lg font-medium transition"
-            >
-              Join Session
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (ended) {
     return (
@@ -329,61 +251,43 @@ export default function LiveSessionPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-4 py-3 flex items-center justify-between gap-2">
-        <Link href="/" className="text-lg font-bold text-white flex-shrink-0">
-          TierMaker
-        </Link>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-sm text-gray-400">
-              {users.length} online
-            </span>
-          </div>
-          <span className="bg-green-900/50 text-green-400 px-3 py-1 rounded-lg text-sm font-mono">
-            {code}
-          </span>
-        </div>
-      </nav>
-
-      {/* User list bar */}
+    <>
       {users.length > 0 && (
         <div className="border-b border-gray-800 px-4 py-2 flex items-center gap-2 overflow-x-auto">
           {users.map((u) => (
             <span
               key={u.id}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                u.id === userId
-                  ? "bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/30"
-                  : u.draggingItemId
-                    ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
-                    : "bg-gray-800 text-gray-300"
-              }`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${u.id === user.id
+                ? "bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/30"
+                : u.draggingItemId
+                  ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
+                  : "bg-gray-800 text-gray-300"
+                }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
-                }`}
+                className={`w-1.5 h-1.5 rounded-full ${u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
+                  }`}
               />
-              {u.name}
-              {u.id === userId && " (you)"}
-              {u.draggingItemId && u.id !== userId && " - moving..."}
+              {u.username}
+              {u.id === user.id && " (you)"}
+              {u.draggingItemId && u.id !== user.id && " - moving..."}
             </span>
           ))}
         </div>
       )}
 
-      <TierListEditor
-        initialData={data}
-        canEditTiers={false}
-        canSave={false}
-        onItemAdded={handleItemAdded}
-        onItemMoved={handleItemMoved}
-        onItemRemoved={handleItemRemoved}
-        onDragBroadcast={handleDragBroadcast}
-        dragIndicators={dragIndicators}
-      />
-    </div>
+      <main className="max-w-2xl mx-auto px-4 py-24 text-center">
+        <TierListEditor
+          initialData={data}
+          canEditTiers={false}
+          canSave={false}
+          onItemAdded={handleItemAdded}
+          onItemMoved={handleItemMoved}
+          onItemRemoved={handleItemRemoved}
+          onDragBroadcast={handleDragBroadcast}
+          dragIndicators={dragIndicators}
+        />
+      </main>
+    </>
   );
 }

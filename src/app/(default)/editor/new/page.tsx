@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import TierListEditor from "@/components/TierListEditor";
 import { TierListData } from "@/lib/types";
 import toast from "react-hot-toast";
-import Link from "next/link";
-import { useAuth } from "@/components/AuthProvider";
 
 const DEFAULT_TIERS = [
   { id: "new-s", label: "S", color: "#ff7f7f", order: 0, items: [] },
@@ -22,18 +20,12 @@ const BLANK_DATA: TierListData = {
   title: "My Tier List",
   tiers: DEFAULT_TIERS,
   unsortedItems: [],
+  liveSessionId: null,
 };
 
 export default function NewEditorPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/login");
-    }
-  }, [user, authLoading, router]);
 
   const handleCreate = async (data: TierListData) => {
     setSaving(true);
@@ -67,32 +59,11 @@ export default function NewEditorPage() {
     }
   };
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400">Loading...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-lg font-bold text-white">
-          TierMaker
-        </Link>
-        <Link
-          href="/dashboard"
-          className="text-sm text-gray-400 hover:text-white transition"
-        >
-          Dashboard
-        </Link>
-      </nav>
-      <TierListEditor
-        initialData={BLANK_DATA}
-        onSave={handleCreate}
-        canSave={!saving}
-      />
-    </div>
+    <TierListEditor
+      initialData={BLANK_DATA}
+      onSave={handleCreate}
+      canSave={!saving}
+    />
   );
 }
