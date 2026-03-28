@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users ────────────────────────────────────────────────────────
+    // Users can only write their own document. Anyone authenticated can read.
+    // Server-side admin SDK writes bypass rules entirely.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Tier Lists ───────────────────────────────────────────────────
+    match /tierlists/{tierlistId} {
+      function isOwner() {
+        return request.auth != null
+            && resource.data.owner == /databases/$(database)/documents/users/$(request.auth.uid);
+      }
+
+      function isOwnerByField() {
+        return request.auth != null
+            && request.resource.data.owner == /databases/$(database)/documents/users/$(request.auth.uid);
+      }
+
+      function hasActiveLiveSession() {
+        return resource.data.liveSession != null;
+      }
+
+      // Anyone can read a tierlist (needed for live session guests)
+      allow read: if true;
+
+      // Only the owner can create (owner ref must match auth uid)
+      allow create: if request.auth != null && isOwnerByField();
+
+      // Only the owner can update or delete
+      allow update, delete: if isOwner();
+
+      // ── Tiers subcollection ──────────────────────────────────────
+      match /tiers/{tierId} {
+        // Anyone can read (live session participants need this)
+        allow read: if true;
+
+        // Only the owner can write tiers
+        // getAfter() is needed so batch creates (parent + subcollections) succeed
+        allow create, update, delete: if request.auth != null
+            && getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
+               == /databases/$(database)/documents/users/$(request.auth.uid);
+      }
+
+      // ── Items subcollection ──────────────────────────────────────
+      match /items/{itemId} {
+        // Anyone can read (live session participants need this)
+        allow read: if true;
+
+        // Owner can always write items
+        // During a live session, anyone (including guests) can write items
+        // getAfter() is needed so batch creates (parent + subcollections) succeed
+        allow create, update, delete: if
+            (request.auth != null
+              && getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
+                 == /databases/$(database)/documents/users/$(request.auth.uid))
+            || getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession != null;
+      }
+    }
+
+    // ── Live Sessions ────────────────────────────────────────────────
+    match /liveSessions/{code} {
+      // Anyone can read (to check/join a session)
+      allow read: if true;
+
+      // Only the owner of the linked tierlist can create a live session
+      // request.resource.data.tierlist is a reference like /tierlists/{id}
+      allow create: if request.auth != null
+          && get(request.resource.data.tierlist).data.owner
+             == /databases/$(database)/documents/users/$(request.auth.uid);
+
+      // Only the owner of the linked tierlist can delete a live session
+      allow delete: if request.auth != null
+          && get(resource.data.tierlist).data.owner
+             == /databases/$(database)/documents/users/$(request.auth.uid);
+
+      // ── Presence subcollection ───────────────────────────────────
+      match /users/{odOrGuestId} {
+        // Anyone can read presence (needed to see who's in the session)
+        allow read: if true;
+
+        // Authenticated users can write their own presence doc
+        // Guests (unauthenticated) can write docs with a guest_ prefix
+        allow create, update: if
+            (request.auth != null && request.auth.uid == odOrGuestId)
+            || (request.auth == null && odOrGuestId.matches('guest_.*'));
+
+        // Authenticated users can delete any presence doc (needed to clean up when ending a session)
+        allow delete: if request.auth != null;
+      }
+    }
+  }
+}

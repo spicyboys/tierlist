@@ -2,20 +2,21 @@ import {
   type SnapshotOptions,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
+  type DocumentReference,
 } from "firebase/firestore";
 
 export interface TierlistDoc {
   title: string;
-  ownerId: string;
-  liveSessionCode: string | null;
+  owner: DocumentReference;
+  liveSession: DocumentReference | null;
 }
 
 export const tierlistConverter: FirestoreDataConverter<TierlistDoc> = {
   toFirestore(tierlist: TierlistDoc) {
     return {
       title: tierlist.title,
-      ownerId: tierlist.ownerId,
-      liveSessionCode: tierlist.liveSessionCode,
+      owner: tierlist.owner,
+      liveSession: tierlist.liveSession,
     };
   },
   fromFirestore(
@@ -25,8 +26,8 @@ export const tierlistConverter: FirestoreDataConverter<TierlistDoc> = {
     const data = snapshot.data(options);
     return {
       title: data.title,
-      ownerId: data.ownerId,
-      liveSessionCode: data.liveSessionCode ?? null,
+      owner: data.owner,
+      liveSession: data.liveSession ?? null,
     };
   },
 };

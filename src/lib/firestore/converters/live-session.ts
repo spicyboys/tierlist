@@ -2,17 +2,19 @@ import {
   type SnapshotOptions,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
+  type DocumentReference,
+  Timestamp,
 } from "firebase/firestore";
 
 export interface LiveSessionDoc {
-  tierlistId: string;
+  tierlist: DocumentReference;
   discordGuildId: string | null;
 }
 
 export const liveSessionConverter: FirestoreDataConverter<LiveSessionDoc> = {
   toFirestore(session: LiveSessionDoc) {
     return {
-      tierlistId: session.tierlistId,
+      tierlist: session.tierlist,
       discordGuildId: session.discordGuildId,
     };
   },
@@ -22,7 +24,7 @@ export const liveSessionConverter: FirestoreDataConverter<LiveSessionDoc> = {
   ): LiveSessionDoc {
     const data = snapshot.data(options);
     return {
-      tierlistId: data.tierlistId,
+      tierlist: data.tierlist,
       discordGuildId: data.discordGuildId ?? null,
     };
   },
@@ -30,17 +32,17 @@ export const liveSessionConverter: FirestoreDataConverter<LiveSessionDoc> = {
 
 export interface LiveSessionUserDoc {
   username: string;
-  lastSeenAt: number;
+  lastSeenAt: Timestamp;
   draggingItemId: string | null;
 }
 
 export const liveSessionUserConverter: FirestoreDataConverter<LiveSessionUserDoc> = {
   toFirestore(user: LiveSessionUserDoc) {
-    return {
-      username: user.username,
-      lastSeenAt: user.lastSeenAt,
-      draggingItemId: user.draggingItemId,
-    };
+    const data: Record<string, unknown> = {};
+    if (user.username !== undefined) data.username = user.username;
+    if (user.lastSeenAt !== undefined) data.lastSeenAt = user.lastSeenAt;
+    if (user.draggingItemId !== undefined) data.draggingItemId = user.draggingItemId;
+    return data;
   },
   fromFirestore(
     snapshot: QueryDocumentSnapshot,

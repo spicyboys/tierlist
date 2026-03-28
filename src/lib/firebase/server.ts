@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { initializeServerApp, initializeApp } from "firebase/app";
 
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase/admin";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -34,10 +34,7 @@ export async function getAuthenticatedAppForUser() {
 
   // Ensure user document exists in Firestore
   if (currentUser) {
-    const db = getFirestore(firebaseServerApp);
-    const userRef = doc(db, "users", currentUser.uid);
-    await setDoc(
-      userRef,
+    await adminDb.doc(`users/${currentUser.uid}`).set(
       { name: currentUser.displayName || "" },
       { merge: true }
     );

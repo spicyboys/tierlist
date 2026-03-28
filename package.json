@@ -17,6 +17,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@opennextjs/cloudflare": "^1.18.0",
+    "@opentelemetry/api": "^1.9.1",
     "cookies-next": "^6.1.1",
     "drizzle-orm": "^0.45.1",
     "firebase": "^12.11.0",

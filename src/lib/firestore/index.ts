@@ -16,6 +16,7 @@ import {
     writeBatch,
     serverTimestamp,
     Unsubscribe,
+    Timestamp,
 } from "firebase/firestore";
 import { TierListData, TierData, TierItem } from "@/lib/types";
 import { customAlphabet } from "nanoid";
@@ -50,6 +51,10 @@ function liveSessionUsersCol(code: string) {
     return collection(db, "liveSessions", code, "users").withConverter(liveSessionUserConverter);
 }
 
+function userDoc(uid: string) {
+    return doc(db, "users", uid);
+}
+
 // ── User ───────────────────────────────────────────────────────────────
 
 export async function ensureUserDocument(uid: string, name: string) {
@@ -72,9 +77,9 @@ export async function createTierList(
     const tierlistRef = doc(db, "tierlists", id);
     batch.set(tierlistRef, {
         title,
-        ownerId: userId,
+        owner: userDoc(userId),
         updatedAt: serverTimestamp(),
-        liveSessionCode: null,
+        liveSession: null,
     });
 
     const tiersCollection = tiersCol(id);
@@ -94,7 +99,7 @@ export async function createTierList(
                 title: item.title,
                 imageUrl: item.imageUrl || null,
                 order: item.order,
-                tierId: tierRef.id,
+                tier: tierRef,
             });
         }
     }
@@ -105,7 +110,7 @@ export async function createTierList(
             title: item.title,
             imageUrl: item.imageUrl || null,
             order: item.order,
-            tierId: null,
+            tier: null,
         });
     }
 
@@ -155,7 +160,7 @@ export async function saveTierList(
                 title: item.title,
                 imageUrl: item.imageUrl || null,
                 order: item.order,
-                tierId: tierRef.id,
+                tier: tierRef,
             });
         }
     }
@@ -166,7 +171,7 @@ export async function saveTierList(
             title: item.title,
             imageUrl: item.imageUrl || null,
             order: item.order,
-            tierId: null,
+            tier: null,
         });
     }
 
@@ -198,7 +203,7 @@ export function subscribeUserTierLists(
 ): Unsubscribe {
     const q = query(
         collection(db, "tierlists").withConverter(tierlistConverter),
-        where("ownerId", "==", userId),
+        where("owner", "==", userDoc(userId)),
         orderBy("updatedAt", "desc"),
     );
 
@@ -251,7 +256,7 @@ export function subscribeTierList(
                     color: t.color,
                     order: t.order,
                     items: itemsData
-                        .filter((i) => i.tierId === t.id)
+                        .filter((i) => i.tier?.id === t.id)
                         .sort((a, b) => a.order - b.order)
                         .map((i) => ({
                             id: i.id,
@@ -262,7 +267,7 @@ export function subscribeTierList(
                 }));
 
             const unsortedItems: TierItem[] = itemsData
-                .filter((i) => !i.tierId)
+                .filter((i) => !i.tier)
                 .sort((a, b) => a.order - b.order)
                 .map((i) => ({
                     id: i.id,
@@ -273,11 +278,11 @@ export function subscribeTierList(
 
             callback({
                 id,
-                ownerId: tierlistData.ownerId,
+                ownerId: tierlistData.owner.id,
                 title: tierlistData.title,
                 tiers,
                 unsortedItems,
-                liveSessionId: tierlistData.liveSessionCode,
+                liveSessionId: tierlistData.liveSession?.id ?? null,
             });
         }, 50);
     }
@@ -312,14 +317,15 @@ export async function createLiveSession(
     discordGuildId: string | null,
 ): Promise<string> {
     const code = generateCode();
+    const tlRef = doc(db, "tierlists", tierlistId);
     await setDoc(liveSessionDoc(code), {
-        tierlistId,
+        tierlist: tlRef,
         discordGuildId,
     });
 
     // Mark the tierlist as having an active live session
-    await updateDoc(doc(db, "tierlists", tierlistId), {
-        liveSessionCode: code,
+    await updateDoc(tlRef, {
+        liveSession: doc(db, "liveSessions", code),
     });
 
     return code;
@@ -332,7 +338,7 @@ export async function endLiveSession(code: string, tierlistId: string) {
     for (const d of usersSnapshot.docs) batch.delete(d.ref);
 
     batch.delete(doc(db, "liveSessions", code));
-    batch.update(doc(db, "tierlists", tierlistId), { liveSessionCode: null });
+    batch.update(doc(db, "tierlists", tierlistId), { liveSession: null });
 
     await batch.commit();
 }
@@ -342,7 +348,11 @@ export async function checkLiveSession(
 ): Promise<{ tierlistId: string; discordGuildId: string | null } | null> {
     const snapshot = await getDoc(liveSessionDoc(code));
     if (!snapshot.exists()) return null;
-    return snapshot.data()!;
+    const data = snapshot.data()!;
+    return {
+        tierlistId: data.tierlist.id,
+        discordGuildId: data.discordGuildId,
+    };
 }
 
 // ── Live Session Item Operations ───────────────────────────────────────
@@ -357,7 +367,7 @@ export async function addTierListItem(
         title,
         imageUrl: imageUrl || null,
         order: Date.now(),
-        tierId: null,
+        tier: null,
     });
     return itemRef.id;
 }
@@ -378,7 +388,7 @@ export async function moveTierListItem(
         .filter((d) => {
             const data = d.data();
             if (d.id === itemId) return false;
-            return targetTierId ? data.tierId === targetTierId : !data.tierId;
+            return targetTierId ? data.tier?.id === targetTierId : !data.tier;
         })
         .map((d) => ({ ref: d.ref, order: d.data().order }))
         .sort((a, b) => a.order - b.order);
@@ -386,8 +396,11 @@ export async function moveTierListItem(
     const insertAt = Math.min(Math.max(order, 0), targetItems.length);
 
     // Update the moved item
+    const targetTierRef = targetTierId
+        ? doc(tiersCol(tierlistId), targetTierId)
+        : null;
     batch.update(doc(items, itemId), {
-        tierId: targetTierId || null,
+        tier: targetTierRef,
         order: insertAt,
     });
 
@@ -420,7 +433,7 @@ export async function updatePresence(
         doc(liveSessionUsersCol(code), userId),
         {
             username,
-            lastSeenAt: Math.floor(Date.now() / 1000),
+            lastSeenAt: Timestamp.fromMillis(Date.now()),
         },
         { merge: true },
     );
@@ -435,7 +448,7 @@ export async function setDragState(
         doc(liveSessionUsersCol(code), userId),
         {
             draggingItemId: itemId || null,
-            lastSeenAt: Math.floor(Date.now() / 1000),
+            lastSeenAt: Timestamp.fromMillis(Date.now()),
         },
         { merge: true },
     );
@@ -462,7 +475,7 @@ export function subscribeLiveSessionUsers(
                     id: d.id,
                     ...d.data(),
                 }))
-                .filter((u) => now - u.lastSeenAt < TIMEOUT);
+                .filter((u) => now - u.lastSeenAt.toMillis() / 1000 < TIMEOUT);
 
             callback(users);
         },
@@ -484,7 +497,7 @@ export function subscribeGuildSessions(
         const sessions = await Promise.all(
             snapshot.docs.map(async (d) => {
                 const data = d.data();
-                const tlDoc = await getDoc(tierlistDoc(data.tierlistId));
+                const tlDoc = await getDoc(tierlistDoc(data.tierlist.id));
                 return {
                     code: d.id,
                     title: tlDoc.exists()

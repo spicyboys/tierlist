@@ -17,6 +17,12 @@ import {
   updatePresence,
   setDragState,
 } from "@/lib/firestore";
+import { customAlphabet } from "nanoid";
+
+const generateGuestId = customAlphabet(
+  "abcdefghijklmnopqrstuvwxyz0123456789",
+  16,
+);
 
 interface LiveUser {
   id: string;
@@ -41,6 +47,31 @@ export default function LiveSessionPage({
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
   const isDraggingRef = useRef(false);
   const presenceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Guest join state
+  const [userName, setUserName] = useState("");
+  const [joined, setJoined] = useState(false);
+  const guestIdRef = useRef<string | null>(null);
+
+  // Auto-join if logged in
+  useEffect(() => {
+    if (user) {
+      setJoined(true);
+    }
+  }, [user]);
+
+  // Effective identity: logged-in user or guest
+  const effectiveId = user?.id ?? guestIdRef.current;
+  const effectiveName = user?.name ?? userName;
+
+  // Lazily create a stable guest ID when joining without auth
+  const getEffectiveId = useCallback((): string => {
+    if (user) return user.id;
+    if (!guestIdRef.current) {
+      guestIdRef.current = `guest_${generateGuestId()}`;
+    }
+    return guestIdRef.current;
+  }, [user]);
 
   // Check if the live session exists and get the tierlist ID
   useEffect(() => {
@@ -79,13 +110,16 @@ export default function LiveSessionPage({
 
   // Subscribe to live session users
   useEffect(() => {
-    if (!user) return;
+    if (!joined) return;
+
+    const id = getEffectiveId();
+    const name = effectiveName;
 
     const unsub = subscribeLiveSessionUsers(code, (liveUsers) => {
       setUsers(liveUsers);
       const indicators: DragIndicator[] = [];
       for (const u of liveUsers) {
-        if (u.id !== user.id && u.draggingItemId) {
+        if (u.id !== id && u.draggingItemId) {
           indicators.push({ itemId: u.draggingItemId, userName: u.username });
         }
       }
@@ -93,9 +127,9 @@ export default function LiveSessionPage({
     });
 
     // Heartbeat for presence
-    updatePresence(code, user.id, user.name);
+    updatePresence(code, id, name);
     presenceRef.current = setInterval(() => {
-      updatePresence(code, user.id, user.name);
+      updatePresence(code, id, name);
     }, 5000);
 
     return () => {
@@ -105,7 +139,7 @@ export default function LiveSessionPage({
         presenceRef.current = null;
       }
     };
-  }, [code, user]);
+  }, [code, joined, effectiveName, getEffectiveId]);
 
   const handleItemAdded = useCallback(
     async (item: TierItem) => {
@@ -138,12 +172,65 @@ export default function LiveSessionPage({
 
   const handleDragBroadcast = useCallback(
     (itemId: string | null) => {
-      if (ended || !user) return;
+      if (ended || !joined) return;
       isDraggingRef.current = !!itemId;
-      setDragState(code, user.id, itemId);
+      setDragState(code, getEffectiveId(), itemId);
     },
-    [code, ended, user],
+    [code, ended, joined, getEffectiveId],
   );
+
+  if (!joined) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
+        <div className="max-w-sm w-full mx-4">
+          <div className="bg-gray-900 rounded-xl p-6">
+            <h1 className="text-xl font-bold mb-1 text-center">
+              Join Live Session
+            </h1>
+            <p className="text-gray-400 text-sm text-center mb-5">
+              Code: <span className="font-mono text-green-400">{code}</span>
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-1">
+                Your Name
+              </label>
+              <input
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && userName.trim()) {
+                    sessionStorage.setItem(
+                      `viewer_name_${code}`,
+                      userName.trim(),
+                    );
+                    setJoined(true);
+                  }
+                }}
+                placeholder="Enter your name"
+                autoFocus
+                className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (!userName.trim()) {
+                  toast.error("Please enter your name");
+                  return;
+                }
+                sessionStorage.setItem(`viewer_name_${code}`, userName.trim());
+                setJoined(true);
+              }}
+              disabled={!userName.trim()}
+              className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-4 py-3 rounded-lg font-medium transition"
+            >
+              Join Session
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (ended) {
     return (
@@ -174,13 +261,13 @@ export default function LiveSessionPage({
 
   return (
     <>
-      {users.length > 0 && user && (
+      {users.length > 0 && effectiveId && (
         <div className="border-b border-gray-800 px-4 py-2 flex items-center gap-2 overflow-x-auto">
           {users.map((u) => (
             <span
               key={u.id}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                u.id === user.id
+                u.id === effectiveId
                   ? "bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/30"
                   : u.draggingItemId
                     ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
@@ -193,8 +280,8 @@ export default function LiveSessionPage({
                 }`}
               />
               {u.username}
-              {u.id === user.id && " (you)"}
-              {u.draggingItemId && u.id !== user.id && " - moving..."}
+              {u.id === effectiveId && " (you)"}
+              {u.draggingItemId && u.id !== effectiveId && " - moving..."}
             </span>
           ))}
         </div>

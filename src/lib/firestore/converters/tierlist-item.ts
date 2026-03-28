@@ -2,13 +2,14 @@ import {
   type SnapshotOptions,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
+  type DocumentReference,
 } from "firebase/firestore";
 
 export interface TierlistItemDoc {
   title: string;
   imageUrl: string | null;
   order: number;
-  tierId: string | null;
+  tier: DocumentReference | null;
 }
 
 export const tierlistItemConverter: FirestoreDataConverter<TierlistItemDoc> = {
@@ -17,7 +18,7 @@ export const tierlistItemConverter: FirestoreDataConverter<TierlistItemDoc> = {
       title: item.title,
       imageUrl: item.imageUrl,
       order: item.order,
-      tierId: item.tierId,
+      tier: item.tier,
     };
   },
   fromFirestore(
@@ -29,7 +30,7 @@ export const tierlistItemConverter: FirestoreDataConverter<TierlistItemDoc> = {
       title: data.title,
       imageUrl: data.imageUrl ?? null,
       order: data.order,
-      tierId: data.tierId ?? null,
+      tier: data.tier ?? null,
     };
   },
 };

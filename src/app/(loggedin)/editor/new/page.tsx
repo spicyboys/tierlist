@@ -45,7 +45,8 @@ export default function NewEditorPage() {
       );
       toast.success("Created and saved!");
       router.push(`/editor/${id}`);
-    } catch {
+    } catch (error) {
+      console.error(error);
       toast.error("Failed to create tier list");
     } finally {
       setSaving(false);
