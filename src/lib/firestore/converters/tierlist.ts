@@ -1,27 +1,32 @@
-import { DocumentReference } from "firebase-admin/firestore";
 import {
   type SnapshotOptions,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { User, userConverter } from "./user";
 
-export class Tierlist {
-  constructor(
-    readonly title: string,
-    readonly owner: DocumentReference<User>,
-  ) { }
+export interface TierlistDoc {
+  title: string;
+  ownerId: string;
+  liveSessionCode: string | null;
 }
 
-export const tierlistConverter: FirestoreDataConverter<Tierlist> = {
-  toFirestore(tierlist: Tierlist) {
-    return { title: tierlist.title, owner: tierlist.owner };
+export const tierlistConverter: FirestoreDataConverter<TierlistDoc> = {
+  toFirestore(tierlist: TierlistDoc) {
+    return {
+      title: tierlist.title,
+      ownerId: tierlist.ownerId,
+      liveSessionCode: tierlist.liveSessionCode,
+    };
   },
   fromFirestore(
     snapshot: QueryDocumentSnapshot,
-    options: SnapshotOptions,
-  ): Tierlist {
+    options?: SnapshotOptions,
+  ): TierlistDoc {
     const data = snapshot.data(options);
-    return new Tierlist(data.title, data.owner.withConverter(userConverter));
+    return {
+      title: data.title,
+      ownerId: data.ownerId,
+      liveSessionCode: data.liveSessionCode ?? null,
+    };
   },
 };

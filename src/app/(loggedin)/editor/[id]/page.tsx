@@ -5,75 +5,25 @@ import { useRouter } from "next/navigation";
 import TierListEditor, { DragIndicator } from "@/components/TierListEditor";
 import { TierListData } from "@/lib/types";
 import toast from "react-hot-toast";
-import { discordSdk } from "@/components/AuthProvider";
-import { db } from "@/lib/firebase/client";
-import { collection, doc, onSnapshot } from "firebase/firestore";
-import { tierlistConverter } from "@/lib/firestore/converters/tierlist";
-import { userConverter } from "@/lib/firestore/converters/user";
+import { useDiscordSDK } from "@/components/DiscordSDKProvider";
+import { useUser } from "@/components/AuthProvider";
+import {
+  subscribeTierList,
+  saveTierList,
+  createLiveSession,
+  endLiveSession,
+  addTierListItem,
+  moveTierListItem,
+  removeTierListItem,
+  subscribeLiveSessionUsers,
+  updatePresence,
+  setDragState,
+} from "@/lib/firestore";
 
 interface LiveUser {
   id: string;
   username: string;
   draggingItemId?: string | null;
-}
-
-function parseTierList(tierList: Record<string, unknown>): TierListData {
-  const tl = tierList as {
-    id: string;
-    ownerId: string;
-    title: string;
-    tiers: Array<{
-      id: string;
-      label: string;
-      color: string;
-      order: number;
-      items: Array<{
-        id: string;
-        title: string;
-        imageUrl: string | null;
-        order: number;
-      }>;
-    }>;
-    items: Array<{
-      id: string;
-      title: string;
-      imageUrl: string | null;
-      order: number;
-    }>;
-    liveSessionId: string | null;
-  };
-  return {
-    id: tl.id,
-    ownerId: tl.ownerId,
-    title: tl.title,
-    tiers: tl.tiers.map((t) => ({
-      id: t.id,
-      label: t.label,
-      color: t.color,
-      order: t.order,
-      items: t.items.map((i) => ({
-        id: i.id,
-        title: i.title,
-        imageUrl: i.imageUrl,
-        order: i.order,
-      })),
-    })),
-    unsortedItems: (tl.items || []).map((i) => ({
-      id: i.id,
-      title: i.title,
-      imageUrl: i.imageUrl,
-      order: i.order,
-    })),
-    liveSessionId: tl.liveSessionId,
-  };
-}
-
-function fingerprint(d: TierListData): string {
-  const tierIds = d.tiers.map(
-    (t) => `${t.id}:${t.items.map((i) => i.id).join(",")}`,
-  );
-  const unsorted = d.unsortedItems.map((i) => i.id).join(",");
-  return `${d.title}|${tierIds.join(";")}|${unsorted}`;
 }
 
 function LiveUserBar({
@@ -121,161 +71,91 @@ export default function EditorPage({
   const { id } = use(params);
   const router = useRouter();
   const user = useUser();
+  const discordSdk = useDiscordSDK();
+  const [data, setData] = useState<TierListData>();
   const [liveCode, setLiveCode] = useState<string | null>(null);
   const [liveUsers, setLiveUsers] = useState<LiveUser[]>([]);
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastFingerprintRef = useRef<string>("");
+  const isDraggingRef = useRef(false);
+  const presenceRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const tierlist = doc(collection(db, "tierlists"), id).withConverter(
-    tierlistConverter,
-  );
-  onSnapshot(tierlist, (snapshot) => {
-    const data = snapshot.data();
-    if (!data) return;
-    data.owner.get().then((ownerDoc) => {
-      const ownerData = ownerDoc.data();
-      if (!ownerData) return;
-      const ownerName = ownerData.name;
-      toast.success(`Tier list updated by ${ownerName}`);
-    });
-  });
-
-  const [data, setData] = useState<TierListData>();
+  // Subscribe to Firestore tier list (real-time updates)
   useEffect(() => {
-    fetch(`/api/tierlist/${id}`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error("Failed to fetch tier list");
-        }
-        return res.json() as Promise<Record<string, unknown>>;
-      })
-      .then((tierList) => {
-        const parsed = parseTierList(tierList);
-        setData(parsed);
-        lastFingerprintRef.current = fingerprint(parsed);
-        if (parsed.liveSessionId) {
-          setLiveCode(parsed.liveSessionId);
-        }
-      })
-      .catch((err) => {
-        toast.error(err.message);
+    const unsub = subscribeTierList(id, (tierListData) => {
+      if (!tierListData) {
+        toast.error("Tier list not found");
         router.push("/");
-      });
+        return;
+      }
+      // Don't overwrite local state while user is dragging
+      if (!isDraggingRef.current) {
+        setData(tierListData);
+      }
+      setLiveCode(tierListData.liveSessionId);
+    });
+    return unsub;
   }, [id, router]);
 
+  // Auth check
   useEffect(() => {
-    if (data && data.ownerId !== user.id) {
+    if (data && user && data.ownerId !== user.id) {
       toast.error("You don't have permission to edit this tier list");
       router.push("/");
     }
-  }, [data, user.id, router]);
+  }, [data, user, router]);
 
-  // Poll full tier list state + users during live session
-  const pollLiveState = useCallback(async () => {
-    if (!liveCode) return;
+  // Subscribe to live session users when live
+  useEffect(() => {
+    if (!liveCode || !user) return;
 
-    try {
-      const res = await fetch(`/api/live/${liveCode}/state`);
-      if (res.status === 404) {
-        // Session not found - probably ended
-        setLiveCode(null);
-        setLiveUsers([]);
-        setDragIndicators([]);
-        return;
-      }
-
-      if (!res.ok) {
-        return;
-      }
-
-      const state = (await res.json()) as Record<string, unknown> & {
-        users?: LiveUser[];
-      };
-      console.table(state.users);
-
-      // Always update users and drag indicators
-      const stateUsers = (state.users || []) as LiveUser[];
-      setLiveUsers(stateUsers);
-
+    const unsub = subscribeLiveSessionUsers(liveCode, (users) => {
+      setLiveUsers(users);
       const indicators: DragIndicator[] = [];
-      for (const u of stateUsers) {
+      for (const u of users) {
         if (u.id !== user.id && u.draggingItemId) {
           indicators.push({ itemId: u.draggingItemId, userName: u.username });
         }
       }
       setDragIndicators(indicators);
-
-      // Only update tier list data if it actually changed
-      if (state.id) {
-        const parsed = parseTierList(state);
-        const fp = fingerprint(parsed);
-        if (fp !== lastFingerprintRef.current) {
-          lastFingerprintRef.current = fp;
-          setData(parsed);
-        }
-      }
-    } catch {
-      // ignore network errors
-    }
-  }, [user, liveCode]);
-
-  // Poll when live session is active (owner only)
-  useEffect(() => {
-    if (liveCode) {
-      pollLiveState();
-      pollRef.current = setInterval(() => pollLiveState(), 1000);
-    } else {
-      setLiveUsers([]);
-      setDragIndicators([]);
-    }
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [liveCode, pollLiveState]);
-
-  const handleSave = async (saveData: TierListData) => {
-    const res = await fetch(`/api/tierlist/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: saveData.title,
-        tiers: saveData.tiers,
-        unsortedItems: saveData.unsortedItems,
-      }),
     });
 
-    if (res.status === 403) {
-      toast.error("Unauthorized");
-      throw new Error("Unauthorized");
-    }
-    if (!res.ok) throw new Error("Failed to save");
+    // Heartbeat for presence
+    updatePresence(liveCode, user.id, user.name);
+    presenceRef.current = setInterval(() => {
+      if (liveCode) updatePresence(liveCode, user.id, user.name);
+    }, 5000);
+
+    return () => {
+      unsub();
+      if (presenceRef.current) {
+        clearInterval(presenceRef.current);
+        presenceRef.current = null;
+      }
+    };
+  }, [liveCode, user]);
+
+  const handleSave = async (saveData: TierListData) => {
+    if (!user) return;
+    await saveTierList(id, {
+      title: saveData.title,
+      tiers: saveData.tiers,
+      unsortedItems: saveData.unsortedItems,
+    });
   };
 
   const handleStartLive = async () => {
-    const res = await fetch("/api/live/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tierListId: id,
-        discordGuildId: discordSdk.guildId,
-      }),
-    });
-    if (res.ok) {
-      const { code } = (await res.json()) as { code: string };
+    try {
+      const code = await createLiveSession(id, discordSdk?.guildId ?? null);
       setLiveCode(code);
       toast.success(`Live session started! Code: ${code}`);
-    } else {
+    } catch {
       toast.error("Failed to start live session");
     }
   };
 
   const handleEndLive = async () => {
     if (liveCode) {
-      await fetch(`/api/live/${liveCode}`, { method: "DELETE" });
+      await endLiveSession(liveCode, id);
     }
     setLiveCode(null);
     toast.success("Live session ended");
@@ -284,52 +164,39 @@ export default function EditorPage({
   const handleLiveItemAdded = useCallback(
     async (item: { title: string; imageUrl: string | null }) => {
       if (!liveCode) return;
-      await fetch(`/api/live/${liveCode}/add-item`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: item.title, imageUrl: item.imageUrl }),
-      });
-      await pollLiveState();
+      await addTierListItem(id, item.title, item.imageUrl);
     },
-    [liveCode, pollLiveState],
+    [liveCode, id],
   );
 
   const handleLiveItemMoved = useCallback(
     async (itemId: string, targetTierId: string | null, newOrder: number) => {
       if (!liveCode) return;
-      await fetch(`/api/live/${liveCode}/move-item`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, tierId: targetTierId, order: newOrder }),
-      });
-      await pollLiveState();
+      isDraggingRef.current = true;
+      try {
+        await moveTierListItem(id, itemId, targetTierId, newOrder);
+      } finally {
+        isDraggingRef.current = false;
+      }
     },
-    [liveCode, pollLiveState],
+    [liveCode, id],
   );
 
   const handleLiveItemRemoved = useCallback(
     async (itemId: string) => {
       if (!liveCode) return;
-      await fetch(`/api/live/${liveCode}/remove-item`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
-      });
-      await pollLiveState();
+      await removeTierListItem(id, itemId);
     },
-    [liveCode, pollLiveState],
+    [liveCode, id],
   );
 
   const handleLiveDragBroadcast = useCallback(
     (itemId: string | null) => {
-      if (!liveCode) return;
-      fetch(`/api/live/${liveCode}/drag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
-      });
+      if (!liveCode || !user) return;
+      setDragState(liveCode, user.id, itemId);
+      isDraggingRef.current = !!itemId;
     },
-    [liveCode],
+    [liveCode, user],
   );
 
   if (!data) {
@@ -342,8 +209,7 @@ export default function EditorPage({
 
   return (
     <>
-      {/* Live user list bar */}
-      {liveCode && liveUsers.length > 0 && (
+      {liveCode && liveUsers.length > 0 && user && (
         <LiveUserBar users={liveUsers} hostUserId={user.id} />
       )}
 

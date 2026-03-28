@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useDiscordSDK } from "@/components/DiscordSDKProvider";
+import { checkLiveSession, subscribeGuildSessions } from "@/lib/firestore";
 
 export default function HomePage() {
   const router = useRouter();
@@ -14,8 +15,8 @@ export default function HomePage() {
     const code = sessionCode.trim().toUpperCase();
     if (!code) return;
 
-    const res = await fetch(`/api/live/${code}`);
-    if (res.ok) {
+    const session = await checkLiveSession(code);
+    if (session) {
       router.push(`/live/${code}`);
     } else {
       toast.error("Session not found or has ended");
@@ -82,19 +83,13 @@ function GuildLiveSessions() {
     Array<{ code: string; title: string }>
   >([]);
   const guildId = discordSdk?.guildId;
+
   useEffect(() => {
-    async function fetchSessions() {
-      if (!guildId) return;
-      const res = await fetch(`/api/live/active?guildId=${guildId}`);
-      if (res.ok) {
-        const data = (await res.json()) as Array<{
-          code: string;
-          title: string;
-        }>;
-        setSessions(data);
-      }
-    }
-    fetchSessions();
+    if (!guildId) return;
+    const unsub = subscribeGuildSessions(guildId, (data) => {
+      setSessions(data);
+    });
+    return unsub;
   }, [guildId]);
 
   if (sessions.length === 0) return null;

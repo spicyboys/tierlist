@@ -10,7 +10,11 @@ import {
 import { setCookie, deleteCookie } from "cookies-next";
 import { type DiscordSDK } from "@discord/embedded-app-sdk";
 import { useDiscordSDK } from "./DiscordSDKProvider";
-import { User } from "@/lib/firestore/converters/user";
+
+interface User {
+  id: string;
+  name: string;
+}
 
 async function userFromDiscord(discordSdk: DiscordSDK) {
   await discordSdk.ready();

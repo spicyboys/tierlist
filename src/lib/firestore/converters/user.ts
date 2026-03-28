@@ -4,22 +4,19 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
-export class User {
-  constructor(
-    readonly id: string,
-    readonly name: string,
-  ) { }
+export interface UserDoc {
+  name: string;
 }
 
-export const userConverter: FirestoreDataConverter<User> = {
-  toFirestore(user: User) {
-    return { id: user.id, name: user.name };
+export const userConverter: FirestoreDataConverter<UserDoc> = {
+  toFirestore(user: UserDoc) {
+    return { name: user.name };
   },
   fromFirestore(
     snapshot: QueryDocumentSnapshot,
-    options: SnapshotOptions,
-  ): User {
+    options?: SnapshotOptions,
+  ): UserDoc {
     const data = snapshot.data(options);
-    return new User(data.id, data.name);
+    return { name: data.name };
   },
 };

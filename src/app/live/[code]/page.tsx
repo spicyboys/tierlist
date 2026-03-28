@@ -6,71 +6,22 @@ import TierListEditor, { DragIndicator } from "@/components/TierListEditor";
 import { TierListData, TierItem } from "@/lib/types";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { auth } from "@/lib/firebase/client";
+import { useUser } from "@/components/AuthProvider";
+import {
+  checkLiveSession,
+  subscribeTierList,
+  subscribeLiveSessionUsers,
+  addTierListItem,
+  moveTierListItem,
+  removeTierListItem,
+  updatePresence,
+  setDragState,
+} from "@/lib/firestore";
 
 interface LiveUser {
   id: string;
   username: string;
   draggingItemId?: string | null;
-}
-
-function parseTierList(data: Record<string, unknown>): TierListData {
-  const tl = data as {
-    id: string;
-    ownerId: string;
-    title: string;
-    tiers: Array<{
-      id: string;
-      label: string;
-      color: string;
-      order: number;
-      items: Array<{
-        id: string;
-        title: string;
-        imageUrl: string | null;
-        order: number;
-      }>;
-    }>;
-    items: Array<{
-      id: string;
-      title: string;
-      imageUrl: string | null;
-      order: number;
-    }>;
-    liveSessionId: string | null;
-  };
-  return {
-    id: tl.id,
-    ownerId: tl.ownerId,
-    title: tl.title,
-    tiers: tl.tiers.map((t) => ({
-      id: t.id,
-      label: t.label,
-      color: t.color,
-      order: t.order,
-      items: t.items.map((i) => ({
-        id: i.id,
-        title: i.title,
-        imageUrl: i.imageUrl,
-        order: i.order,
-      })),
-    })),
-    unsortedItems: (tl.items || []).map((i) => ({
-      id: i.id,
-      title: i.title,
-      imageUrl: i.imageUrl,
-      order: i.order,
-    })),
-    liveSessionId: tl.liveSessionId,
-  };
-}
-
-function fingerprint(d: TierListData): string {
-  const tierIds = d.tiers.map(
-    (t) => `${t.id}:${t.items.map((i) => i.id).join(",")}`,
-  );
-  const unsorted = d.unsortedItems.map((i) => i.id).join(",");
-  return `${d.title}|${tierIds.join(";")}|${unsorted}`;
 }
 
 export default function LiveSessionPage({
@@ -81,144 +32,117 @@ export default function LiveSessionPage({
   const { code: rawCode } = use(params);
   const code = rawCode.toUpperCase();
   const router = useRouter();
+  const user = useUser();
   const [data, setData] = useState<TierListData | null>(null);
+  const [tierlistId, setTierlistId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [ended, setEnded] = useState(false);
   const [users, setUsers] = useState<LiveUser[]>([]);
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastFingerprintRef = useRef<string>("");
   const isDraggingRef = useRef(false);
-  const user = auth.currentUser;
+  const presenceRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const pollState = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/live/${code}/state`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          if (data !== null) {
-            toast.error("Session ended");
-            setEnded(true);
-          }
-        }
-
-        if (pollRef.current) clearInterval(pollRef.current);
-        return;
-      }
-
-      const state = (await res.json()) as Record<string, unknown> & {
-        users?: LiveUser[];
-      };
-
-      // Always update users and drag indicators
-      if (state.users) {
-        setUsers(state.users);
-        const indicators: DragIndicator[] = [];
-        for (const u of state.users) {
-          if (u.id !== user.id && u.draggingItemId) {
-            indicators.push({ itemId: u.draggingItemId, userName: u.username });
-          }
-        }
-        setDragIndicators(indicators);
-      }
-
-      // Only update tier list data if changed and not dragging
-      if (state.id && !isDraggingRef.current) {
-        const parsed = parseTierList(state as Record<string, unknown>);
-        const fp = fingerprint(parsed);
-        if (fp !== lastFingerprintRef.current) {
-          lastFingerprintRef.current = fp;
-          setData(parsed);
-        }
-      }
-    } catch {
-      // Network error, keep polling
-    }
-  }, [code, user.id]);
-
+  // Check if the live session exists and get the tierlist ID
   useEffect(() => {
-    fetch(`/api/live/${code}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Session not found");
-        return res.json() as Promise<unknown>;
-      })
-      .then(() => pollState())
-      .then(() => {
-        setLoading(false);
-        pollRef.current = setInterval(pollState, 1000);
-      })
-      .catch(() => {
+    checkLiveSession(code).then((session) => {
+      if (!session) {
         toast.error("Session not found");
         router.push("/");
-      });
+        return;
+      }
+      setTierlistId(session.tierlistId);
+      setLoading(false);
+    });
+  }, [code, router]);
+
+  // Subscribe to tier list data
+  useEffect(() => {
+    if (!tierlistId) return;
+    const unsub = subscribeTierList(tierlistId, (tierListData) => {
+      if (!tierListData) {
+        toast.error("Session ended");
+        setEnded(true);
+        return;
+      }
+      // Check if live session was removed
+      if (!tierListData.liveSessionId) {
+        toast.error("Session ended");
+        setEnded(true);
+        return;
+      }
+      if (!isDraggingRef.current) {
+        setData(tierListData);
+      }
+    });
+    return unsub;
+  }, [tierlistId]);
+
+  // Subscribe to live session users
+  useEffect(() => {
+    if (!user) return;
+
+    const unsub = subscribeLiveSessionUsers(code, (liveUsers) => {
+      setUsers(liveUsers);
+      const indicators: DragIndicator[] = [];
+      for (const u of liveUsers) {
+        if (u.id !== user.id && u.draggingItemId) {
+          indicators.push({ itemId: u.draggingItemId, userName: u.username });
+        }
+      }
+      setDragIndicators(indicators);
+    });
+
+    // Heartbeat for presence
+    updatePresence(code, user.id, user.name);
+    presenceRef.current = setInterval(() => {
+      updatePresence(code, user.id, user.name);
+    }, 5000);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      unsub();
+      if (presenceRef.current) {
+        clearInterval(presenceRef.current);
+        presenceRef.current = null;
+      }
     };
-  }, [code, router, pollState]);
+  }, [code, user]);
 
   const handleItemAdded = useCallback(
     async (item: TierItem) => {
-      if (ended) return;
-
-      await fetch(`/api/live/${code}/add-item`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: item.title, imageUrl: item.imageUrl }),
-      });
-      await pollState();
+      if (ended || !tierlistId) return;
+      await addTierListItem(tierlistId, item.title, item.imageUrl);
     },
-    [code, pollState, ended],
+    [tierlistId, ended],
   );
 
   const handleItemMoved = useCallback(
     async (itemId: string, targetTierId: string | null, newOrder: number) => {
-      if (ended) return;
-
-      await fetch(`/api/live/${code}/move-item`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemId,
-          tierId: targetTierId,
-          order: newOrder,
-        }),
-      });
-      await pollState();
+      if (ended || !tierlistId) return;
+      isDraggingRef.current = true;
+      try {
+        await moveTierListItem(tierlistId, itemId, targetTierId, newOrder);
+      } finally {
+        isDraggingRef.current = false;
+      }
     },
-    [code, pollState, ended],
+    [tierlistId, ended],
   );
 
   const handleItemRemoved = useCallback(
     async (itemId: string) => {
-      if (ended) return;
-
-      await fetch(`/api/live/${code}/remove-item`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
-      });
-      await pollState();
+      if (ended || !tierlistId) return;
+      await removeTierListItem(tierlistId, itemId);
     },
-    [code, pollState, ended],
+    [tierlistId, ended],
   );
 
   const handleDragBroadcast = useCallback(
     (itemId: string | null) => {
-      if (ended) return;
-
-      if (itemId) {
-        isDraggingRef.current = true;
-      } else {
-        isDraggingRef.current = false;
-      }
-      fetch(`/api/live/${code}/drag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
-      });
+      if (ended || !user) return;
+      isDraggingRef.current = !!itemId;
+      setDragState(code, user.id, itemId);
     },
-    [code, ended],
+    [code, ended, user],
   );
 
   if (ended) {
@@ -250,7 +174,7 @@ export default function LiveSessionPage({
 
   return (
     <>
-      {users.length > 0 && (
+      {users.length > 0 && user && (
         <div className="border-b border-gray-800 px-4 py-2 flex items-center gap-2 overflow-x-auto">
           {users.map((u) => (
             <span

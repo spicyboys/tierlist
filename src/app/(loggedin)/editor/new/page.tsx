@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import TierListEditor from "@/components/TierListEditor";
 import { TierListData } from "@/lib/types";
+import { useUser } from "@/components/AuthProvider";
+import { createTierList } from "@/lib/firestore";
 import toast from "react-hot-toast";
 
 const DEFAULT_TIERS = [
@@ -25,35 +27,26 @@ const BLANK_DATA: TierListData = {
 
 export default function NewEditorPage() {
   const router = useRouter();
+  const user = useUser();
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async (data: TierListData) => {
+    if (!user) {
+      toast.error("Sign in to create a tier list");
+      return;
+    }
     setSaving(true);
     try {
-      const createRes = await fetch("/api/tierlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: data.title }),
-      });
-
-      if (!createRes.ok) throw new Error("Failed to create tier list");
-      const created = (await createRes.json()) as { id: string };
-
-      // Save the full state
-      const saveRes = await fetch(`/api/tierlist/${created.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: data.title,
-          tiers: data.tiers,
-          unsortedItems: data.unsortedItems,
-        }),
-      });
-
-      if (!saveRes.ok) throw new Error("Failed to save");
-
+      const id = await createTierList(
+        user.id,
+        data.title,
+        data.tiers,
+        data.unsortedItems,
+      );
       toast.success("Created and saved!");
-      router.push(`/editor/${created.id}`);
+      router.push(`/editor/${id}`);
+    } catch {
+      toast.error("Failed to create tier list");
     } finally {
       setSaving(false);
     }
