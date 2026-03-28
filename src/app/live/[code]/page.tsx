@@ -6,7 +6,7 @@ import TierListEditor, { DragIndicator } from "@/components/TierListEditor";
 import { TierListData, TierItem } from "@/lib/types";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { useUser } from "@/components/UserProvider";
+import { auth } from "@/lib/firebase/client";
 
 interface LiveUser {
   id: string;
@@ -67,7 +67,7 @@ function parseTierList(data: Record<string, unknown>): TierListData {
 
 function fingerprint(d: TierListData): string {
   const tierIds = d.tiers.map(
-    (t) => `${t.id}:${t.items.map((i) => i.id).join(",")}`
+    (t) => `${t.id}:${t.items.map((i) => i.id).join(",")}`,
   );
   const unsorted = d.unsortedItems.map((i) => i.id).join(",");
   return `${d.title}|${tierIds.join(";")}|${unsorted}`;
@@ -89,7 +89,7 @@ export default function LiveSessionPage({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFingerprintRef = useRef<string>("");
   const isDraggingRef = useRef(false);
-  const user = useUser();
+  const user = auth.currentUser;
 
   const pollState = useCallback(async () => {
     try {
@@ -168,7 +168,7 @@ export default function LiveSessionPage({
       });
       await pollState();
     },
-    [code, pollState, ended]
+    [code, pollState, ended],
   );
 
   const handleItemMoved = useCallback(
@@ -186,7 +186,7 @@ export default function LiveSessionPage({
       });
       await pollState();
     },
-    [code, pollState, ended]
+    [code, pollState, ended],
   );
 
   const handleItemRemoved = useCallback(
@@ -200,7 +200,7 @@ export default function LiveSessionPage({
       });
       await pollState();
     },
-    [code, pollState, ended]
+    [code, pollState, ended],
   );
 
   const handleDragBroadcast = useCallback(
@@ -218,7 +218,7 @@ export default function LiveSessionPage({
         body: JSON.stringify({ itemId }),
       });
     },
-    [code, ended]
+    [code, ended],
   );
 
   if (ended) {
@@ -255,16 +255,18 @@ export default function LiveSessionPage({
           {users.map((u) => (
             <span
               key={u.id}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${u.id === user.id
-                ? "bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/30"
-                : u.draggingItemId
-                  ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
-                  : "bg-gray-800 text-gray-300"
-                }`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                u.id === user.id
+                  ? "bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/30"
+                  : u.draggingItemId
+                    ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
+                    : "bg-gray-800 text-gray-300"
+              }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
-                  }`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
+                }`}
               />
               {u.username}
               {u.id === user.id && " (you)"}

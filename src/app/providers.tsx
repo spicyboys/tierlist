@@ -1,13 +1,14 @@
 "use client";
 
+import DiscordSDKProvider from "@/components/DiscordSDKProvider";
 import { Toaster } from "react-hot-toast";
-import AuthProvider from "@/components/AuthProvider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  console.log("Providers rendering");
   return (
-    <AuthProvider>
+    <DiscordSDKProvider>
       {children}
       <Toaster position="bottom-right" />
-    </AuthProvider>
+    </DiscordSDKProvider>
   );
 }

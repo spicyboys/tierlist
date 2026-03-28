@@ -6,7 +6,10 @@ import TierListEditor, { DragIndicator } from "@/components/TierListEditor";
 import { TierListData } from "@/lib/types";
 import toast from "react-hot-toast";
 import { discordSdk } from "@/components/AuthProvider";
-import { useUser } from "@/components/UserProvider";
+import { db } from "@/lib/firebase/client";
+import { collection, doc, onSnapshot } from "firebase/firestore";
+import { tierlistConverter } from "@/lib/firestore/converters/tierlist";
+import { userConverter } from "@/lib/firestore/converters/user";
 
 interface LiveUser {
   id: string;
@@ -20,10 +23,23 @@ function parseTierList(tierList: Record<string, unknown>): TierListData {
     ownerId: string;
     title: string;
     tiers: Array<{
-      id: string; label: string; color: string; order: number;
-      items: Array<{ id: string; title: string; imageUrl: string | null; order: number }>;
+      id: string;
+      label: string;
+      color: string;
+      order: number;
+      items: Array<{
+        id: string;
+        title: string;
+        imageUrl: string | null;
+        order: number;
+      }>;
     }>;
-    items: Array<{ id: string; title: string; imageUrl: string | null; order: number }>;
+    items: Array<{
+      id: string;
+      title: string;
+      imageUrl: string | null;
+      order: number;
+    }>;
     liveSessionId: string | null;
   };
   return {
@@ -31,13 +47,22 @@ function parseTierList(tierList: Record<string, unknown>): TierListData {
     ownerId: tl.ownerId,
     title: tl.title,
     tiers: tl.tiers.map((t) => ({
-      id: t.id, label: t.label, color: t.color, order: t.order,
+      id: t.id,
+      label: t.label,
+      color: t.color,
+      order: t.order,
       items: t.items.map((i) => ({
-        id: i.id, title: i.title, imageUrl: i.imageUrl, order: i.order,
+        id: i.id,
+        title: i.title,
+        imageUrl: i.imageUrl,
+        order: i.order,
       })),
     })),
     unsortedItems: (tl.items || []).map((i) => ({
-      id: i.id, title: i.title, imageUrl: i.imageUrl, order: i.order,
+      id: i.id,
+      title: i.title,
+      imageUrl: i.imageUrl,
+      order: i.order,
     })),
     liveSessionId: tl.liveSessionId,
   };
@@ -45,7 +70,7 @@ function parseTierList(tierList: Record<string, unknown>): TierListData {
 
 function fingerprint(d: TierListData): string {
   const tierIds = d.tiers.map(
-    (t) => `${t.id}:${t.items.map((i) => i.id).join(",")}`
+    (t) => `${t.id}:${t.items.map((i) => i.id).join(",")}`,
   );
   const unsorted = d.unsortedItems.map((i) => i.id).join(",");
   return `${d.title}|${tierIds.join(";")}|${unsorted}`;
@@ -64,16 +89,18 @@ function LiveUserBar({
         return (
           <span
             key={u.id}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${u.id === hostUserId
-              ? "bg-purple-900/50 text-purple-300 ring-1 ring-purple-500/30"
-              : u.draggingItemId
-                ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
-                : "bg-gray-800 text-gray-300"
-              }`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+              u.id === hostUserId
+                ? "bg-purple-900/50 text-purple-300 ring-1 ring-purple-500/30"
+                : u.draggingItemId
+                  ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
+                  : "bg-gray-800 text-gray-300"
+            }`}
           >
             <span
-              className={`w-1.5 h-1.5 rounded-full ${u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
-                }`}
+              className={`w-1.5 h-1.5 rounded-full ${
+                u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
+              }`}
             />
 
             {u.username}
@@ -86,7 +113,11 @@ function LiveUserBar({
   );
 }
 
-export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default function EditorPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const router = useRouter();
   const user = useUser();
@@ -95,6 +126,20 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFingerprintRef = useRef<string>("");
+
+  const tierlist = doc(collection(db, "tierlists"), id).withConverter(
+    tierlistConverter,
+  );
+  onSnapshot(tierlist, (snapshot) => {
+    const data = snapshot.data();
+    if (!data) return;
+    data.owner.get().then((ownerDoc) => {
+      const ownerData = ownerDoc.data();
+      if (!ownerData) return;
+      const ownerName = ownerData.name;
+      toast.success(`Tier list updated by ${ownerName}`);
+    });
+  });
 
   const [data, setData] = useState<TierListData>();
   useEffect(() => {
@@ -131,9 +176,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (!liveCode) return;
 
     try {
-      const res = await fetch(
-        `/api/live/${liveCode}/state`
-      );
+      const res = await fetch(`/api/live/${liveCode}/state`);
       if (res.status === 404) {
         // Session not found - probably ended
         setLiveCode(null);
@@ -216,7 +259,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     const res = await fetch("/api/live/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tierListId: id, discordGuildId: discordSdk.guildId }),
+      body: JSON.stringify({
+        tierListId: id,
+        discordGuildId: discordSdk.guildId,
+      }),
     });
     if (res.ok) {
       const { code } = (await res.json()) as { code: string };
@@ -245,7 +291,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       });
       await pollLiveState();
     },
-    [liveCode, pollLiveState]
+    [liveCode, pollLiveState],
   );
 
   const handleLiveItemMoved = useCallback(
@@ -258,7 +304,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       });
       await pollLiveState();
     },
-    [liveCode, pollLiveState]
+    [liveCode, pollLiveState],
   );
 
   const handleLiveItemRemoved = useCallback(
@@ -271,7 +317,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       });
       await pollLiveState();
     },
-    [liveCode, pollLiveState]
+    [liveCode, pollLiveState],
   );
 
   const handleLiveDragBroadcast = useCallback(
@@ -283,7 +329,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         body: JSON.stringify({ itemId }),
       });
     },
-    [liveCode]
+    [liveCode],
   );
 
   if (!data) {
@@ -296,13 +342,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <>
-
       {/* Live user list bar */}
       {liveCode && liveUsers.length > 0 && (
-        <LiveUserBar
-          users={liveUsers}
-          hostUserId={user.id}
-        />
+        <LiveUserBar users={liveUsers} hostUserId={user.id} />
       )}
 
       <main className="max-w-2xl mx-auto px-4 py-24 text-center">
@@ -319,7 +361,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           onDragBroadcast={liveCode ? handleLiveDragBroadcast : undefined}
           dragIndicators={liveCode ? dragIndicators : undefined}
         />
-      </main >
+      </main>
     </>
   );
 }

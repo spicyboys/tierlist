@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, schema } from "@/lib/db";
-import { createJWT, authCookie } from "@/lib/auth";
+import { adminAuth } from "@/lib/firebase/admin";
 
 export async function POST(req: NextRequest) {
   const { code } = (await req.json()) as {
@@ -32,28 +31,14 @@ export async function POST(req: NextRequest) {
   const user = await userResponse.json() as {
     id: string;
     username: string;
+    email: string;
   };
 
-  const db = getDb();
-  await db
-    .insert(schema.users)
-    .values({
-      id: user.id,
-      username: user.username,
-    })
-    .onConflictDoUpdate({
-      target: schema.users.id,
-      set: {
-        username: user.username,
-      },
-    })
-    .run();
-
-  const token = await createJWT({ userId: user.id, username: user.username });
-  const res = NextResponse.json({
-    id: user.id,
+  const customToken = await adminAuth.createCustomToken(user.id, {
     username: user.username,
   });
-  res.headers.set("Set-Cookie", authCookie(token));
-  return res;
+
+  return NextResponse.json({
+    customToken,
+  });
 }

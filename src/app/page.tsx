@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { discordSdk } from "@/components/AuthProvider";
+import { useDiscordSDK } from "@/components/DiscordSDKProvider";
 
 export default function HomePage() {
-  console.log("Rendering HomePage");
   const router = useRouter();
   const [sessionCode, setSessionCode] = useState("");
 
@@ -48,7 +47,6 @@ export default function HomePage() {
         </Link>
       </div>
 
-
       <div className="bg-gray-900 rounded-xl p-6 max-w-sm mx-auto">
         <h2 className="text-sm font-medium text-gray-400 mb-3">
           Join a Live Session
@@ -79,18 +77,25 @@ export default function HomePage() {
 }
 
 function GuildLiveSessions() {
-  const [sessions, setSessions] = useState<Array<{ code: string; title: string }>>([]);
+  const discordSdk = useDiscordSDK();
+  const [sessions, setSessions] = useState<
+    Array<{ code: string; title: string }>
+  >([]);
+  const guildId = discordSdk?.guildId;
   useEffect(() => {
     async function fetchSessions() {
-      if (!discordSdk.guildId) return;
-      const res = await fetch(`/api/live/active?guildId=${discordSdk.guildId}`);
+      if (!guildId) return;
+      const res = await fetch(`/api/live/active?guildId=${guildId}`);
       if (res.ok) {
-        const data = await res.json() as Array<{ code: string; title: string }>;
+        const data = (await res.json()) as Array<{
+          code: string;
+          title: string;
+        }>;
         setSessions(data);
       }
     }
     fetchSessions();
-  }, []);
+  }, [guildId]);
 
   if (sessions.length === 0) return null;
 
