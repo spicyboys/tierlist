@@ -1,1 +1,0 @@
-ALTER TABLE `live_sessions` ADD `discord_guild_id` text;
