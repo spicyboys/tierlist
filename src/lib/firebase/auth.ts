@@ -22,7 +22,21 @@ export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
 
   try {
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    const idToken = await result.user.getIdToken();
+
+    // Check if another account with the same email exists and link them
+    const response = await fetch("/api/auth/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+
+    const data = (await response.json()) as { customToken?: string };
+    if (data.customToken) {
+      // Sign in as the existing account instead
+      await _signInWithCustomToken(auth, data.customToken);
+    }
   } catch (error) {
     console.error("Error signing in with Google", error);
   }

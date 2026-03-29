@@ -1,15 +1,15 @@
 "use client";
 
-import { JSX, useCallback, useEffect, useState } from "react";
+import { JSX, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   onIdTokenChanged,
   signInWithCustomToken,
   signInWithGoogle,
 } from "@/lib/firebase/auth";
-import { setCookie, deleteCookie } from "cookies-next";
 import { type DiscordSDK } from "@discord/embedded-app-sdk";
 import { useDiscordSDK } from "./DiscordSDKProvider";
+import { deleteSessionCookie, setSessionCookie } from "@/lib/session";
 
 interface User {
   id: string;
@@ -43,22 +43,25 @@ async function userFromDiscord(discordSdk: DiscordSDK) {
 }
 
 function useUserSession(initialUser: User | null) {
-  useEffect(() => {
-    return onIdTokenChanged(async (user) => {
-      if (user) {
-        const idToken = await user.getIdToken();
-        await setCookie("__session", idToken);
-      } else {
-        await deleteCookie("__session");
-      }
-      if (initialUser?.id === user?.uid) {
-        return;
-      }
-      window.location.reload();
-    });
-  }, [initialUser]);
+  const [user, setUser] = useState<User | null>(initialUser);
 
-  return initialUser;
+  useEffect(() => {
+    return onIdTokenChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        const idToken = await firebaseUser.getIdToken();
+        await setSessionCookie(idToken);
+        setUser({
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || "",
+        });
+      } else {
+        await deleteSessionCookie();
+        setUser(null);
+      }
+    });
+  }, []);
+
+  return user;
 }
 
 export default function PageHeader({
@@ -69,10 +72,12 @@ export default function PageHeader({
   const user = useUserSession(initialUser);
 
   const discordSdk = useDiscordSDK();
+  const discordAuthStarted = useRef(false);
   useEffect(() => {
-    if (user) return;
+    if (user !== null) return;
     if (!discordSdk) return;
-
+    if (discordAuthStarted.current) return;
+    discordAuthStarted.current = true;
     userFromDiscord(discordSdk);
   }, [discordSdk, user]);
 

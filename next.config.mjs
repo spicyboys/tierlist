@@ -3,7 +3,14 @@ const nextConfig = {
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
+  allowedOrigins: ["1486864508960899153.discordsays.com"],
   allowedDevOrigins: ["1486864508960899153.discordsays.com"],
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["1486864508960899153.discordsays.com"],
+      allowedDevOrigins: ["1486864508960899153.discordsays.com"],
+    }
+  }
 };
 
 export default nextConfig;
