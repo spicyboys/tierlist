@@ -27,13 +27,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { currentUser } = await getAuthenticatedAppForUser();
+  const { currentUser, discordAccessToken } =
+    await getAuthenticatedAppForUser();
   return (
     <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-950`}
       >
-        <Providers initialUser={currentUser}>
+        <Providers
+          initialUser={currentUser}
+          initialDiscordAccessToken={discordAccessToken}
+        >
           <div className="min-h-screen bg-gray-950 text-white">
             <PageHeader />
             {children}

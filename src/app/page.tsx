@@ -25,6 +25,18 @@ export default function HomePage() {
     }
   };
 
+  const discordSdk = useDiscordSDK();
+  useEffect(() => {
+    if (!discordSdk) return;
+    if (discordSdk.customId !== null) {
+      // Handle `live_session_${code}`
+      if (discordSdk.customId.startsWith("live_session_")) {
+        const code = discordSdk.customId.replace("live_session_", "");
+        router.push(`/live/${code}`);
+      }
+    }
+  }, [discordSdk, router]);
+
   return (
     <main className="max-w-2xl mx-auto px-4 py-24 text-center">
       <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">

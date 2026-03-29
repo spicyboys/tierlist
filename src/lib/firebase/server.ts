@@ -4,8 +4,50 @@ import { cookies } from "next/headers";
 import { initializeServerApp, initializeApp } from "firebase/app";
 
 import { getAuth } from "firebase/auth";
-import { adminDb } from "@/lib/firebase/admin";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import type { UserDoc } from "../firestore/converters/user";
+
+export interface DiscordTokens {
+  access_token: string;
+  refresh_token: string;
+  expiry: number;
+}
+
+export async function refreshDiscordTokens(
+  uid: string,
+  refreshToken: string,
+): Promise<DiscordTokens> {
+  const response = await fetch("https://discord.com/api/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      client_id: process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!,
+      client_secret: process.env.DISCORD_CLIENT_SECRET!,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Discord token refresh failed: ${response.status}`);
+  }
+
+  const { access_token, refresh_token, expires_in } =
+    (await response.json()) as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    };
+
+  const expiry = Date.now() + expires_in * 1000;
+  const discord: DiscordTokens = { access_token, refresh_token, expiry };
+
+  await adminAuth.setCustomUserClaims(uid, { discord });
+
+  return discord;
+}
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -54,5 +96,31 @@ export async function getAuthenticatedAppForUser() {
     }
   }
 
-  return { firebaseServerApp, currentUser: user };
+  let discordAccessToken: string | null = null;
+
+  if (currentUser) {
+    const userRecord = await adminAuth.getUser(currentUser.uid);
+    const discordClaims = userRecord.customClaims?.discord as
+      | DiscordTokens
+      | undefined;
+
+    if (discordClaims) {
+      // Refresh if expired or expiring within 5 minutes
+      if (discordClaims.expiry < Date.now() + 5 * 60 * 1000) {
+        try {
+          const refreshed = await refreshDiscordTokens(
+            currentUser.uid,
+            discordClaims.refresh_token,
+          );
+          discordAccessToken = refreshed.access_token;
+        } catch (e) {
+          console.error("Failed to refresh Discord token:", e);
+        }
+      } else {
+        discordAccessToken = discordClaims.access_token;
+      }
+    }
+  }
+
+  return { firebaseServerApp, currentUser: user, discordAccessToken };
 }

@@ -148,6 +148,17 @@ export default function EditorPage({
       const code = await createLiveSession(id, discordSdk?.guildId ?? null);
       setLiveCode(code);
       toast.success(`Live session started! Code: ${code}`);
+
+      if (discordSdk) {
+        try {
+          await discordSdk.commands.shareLink({
+            message: `Join my live tierlist session! Code: ${code}`,
+            custom_id: `live_session_${code}`,
+          });
+        } catch (e) {
+          console.error("Failed to share live session link on Discord:", e);
+        }
+      }
     } catch {
       toast.error("Failed to start live session");
     }

@@ -18,8 +18,10 @@ export async function POST(req: NextRequest) {
     }),
   });
 
-  const { access_token } = (await response.json()) as {
+  const { access_token, refresh_token, expires_in } = (await response.json()) as {
     access_token: string;
+    refresh_token: string;
+    expires_in: number;
   };
 
   const userResponse = await fetch('https://discord.com/api/users/@me', {
@@ -49,6 +51,9 @@ export async function POST(req: NextRequest) {
     });
     uid = created.uid;
   }
+
+  const expiry = Date.now() + (expires_in * 1000);
+  await adminAuth.setCustomUserClaims(uid, { discord: { access_token, refresh_token, expiry } });
 
   // Store Discord username in Firestore with hasCustomName flag
   await adminDb.doc(`users/${uid}`).set(

@@ -69,7 +69,9 @@ async function userFromDiscord(discordSdk: DiscordSDK) {
     }),
   });
 
-  const data = (await response.json()) as { customToken: string };
+  const data = (await response.json()) as {
+    customToken: string;
+  };
 
   // Sign in to Firebase Auth with the custom token
   await signInWithCustomToken(data.customToken);
@@ -77,18 +79,32 @@ async function userFromDiscord(discordSdk: DiscordSDK) {
 
 export default function AuthProvider({
   initialUser,
+  initialDiscordAccessToken,
   children,
 }: {
   initialUser: UserDoc | null;
+  initialDiscordAccessToken: string | null;
   children: ReactNode;
 }) {
+  const discordSdk = useDiscordSDK();
   const [user, setUser] = useState(initialUser);
+  const [discordAccessToken, setDiscordAccessToken] = useState(
+    initialDiscordAccessToken,
+  );
 
   useEffect(() => {
     return onIdTokenChanged(async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        const idToken = await firebaseUser.getIdToken();
-        await setSessionCookie(idToken);
+        const idToken = await firebaseUser.getIdTokenResult();
+        await setSessionCookie(idToken.token);
+
+        const discordClaims = idToken.claims.discord as
+          | { access_token: string }
+          | undefined;
+
+        if (discordClaims && discordSdk) {
+          setDiscordAccessToken(discordClaims.access_token);
+        }
 
         // Ensure Firestore user document exists
         await ensureUserDocument(
@@ -108,18 +124,29 @@ export default function AuthProvider({
         setUser(null);
       }
     });
-  }, []);
+  }, [discordSdk]);
 
-  // Auto-authenticate via Discord if in Discord environment
-  const discordSdk = useDiscordSDK();
   const discordAuthStarted = useRef(false);
   useEffect(() => {
     if (user !== null) return;
     if (!discordSdk) return;
     if (discordAuthStarted.current) return;
+
+    // Avoid re-entrant calls to this effect
     discordAuthStarted.current = true;
+
     userFromDiscord(discordSdk);
   }, [discordSdk, user]);
+
+  // Authenticate with the Discord SDK whenever we get a new access token
+  useEffect(() => {
+    if (!discordSdk) return;
+    if (!discordAccessToken) return;
+
+    discordSdk.commands.authenticate({
+      access_token: discordAccessToken,
+    });
+  }, [discordSdk, discordAccessToken]);
 
   const setDisplayName = useCallback(
     async (name: string) => {
