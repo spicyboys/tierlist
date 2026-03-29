@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useDiscordSDK } from "@/components/DiscordSDKProvider";
+import { useUser } from "@/components/AuthProvider";
 import { checkLiveSession, subscribeGuildSessions } from "@/lib/firestore";
 
 export default function HomePage() {
   const router = useRouter();
+  const user = useUser();
   const [sessionCode, setSessionCode] = useState("");
 
   const handleJoinSession = async () => {
@@ -33,20 +35,22 @@ export default function HomePage() {
         collaborate in real-time.
       </p>
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-        <Link
-          href="/editor/new"
-          className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl text-lg font-medium transition shadow-lg shadow-blue-600/20"
-        >
-          Create Tier List
-        </Link>
-        <Link
-          href="/dashboard"
-          className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-xl text-lg font-medium transition"
-        >
-          My Tier Lists
-        </Link>
-      </div>
+      {user && (
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+          <Link
+            href="/editor/new"
+            className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl text-lg font-medium transition shadow-lg shadow-blue-600/20"
+          >
+            Create Tier List
+          </Link>
+          <Link
+            href="/dashboard"
+            className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-xl text-lg font-medium transition"
+          >
+            My Tier Lists
+          </Link>
+        </div>
+      )}
 
       <div className="bg-gray-900 rounded-xl p-6 max-w-sm mx-auto">
         <h2 className="text-sm font-medium text-gray-400 mb-3">

@@ -546,42 +546,91 @@ export default function TierListEditor({
   const handleExportPNG = async () => {
     if (!tierListRef.current) return;
     setExporting(true);
-    const replacements: { img: HTMLImageElement; div: HTMLDivElement }[] = [];
     try {
-      tierListRef.current.setAttribute("data-exporting", "true");
+      const renderScale = 4;
 
-      // html2canvas doesn't support object-fit:cover, so swap <img> to
-      // background-image divs which DO support background-size:cover
-      const imgs = tierListRef.current.querySelectorAll<HTMLImageElement>(".export-img");
-      imgs.forEach((img) => {
-        const div = document.createElement("div");
-        div.className = img.className;
-        div.style.backgroundImage = `url(${img.src})`;
-        div.style.backgroundSize = "cover";
-        div.style.backgroundPosition = "center";
-        div.style.width = "100px";
-        div.style.height = "100px";
-        img.parentNode?.insertBefore(div, img);
-        img.style.display = "none";
-        replacements.push({ img, div });
+      // Clone the tier list offscreen so we can mutate it without visual glitches
+      const clone = tierListRef.current.cloneNode(true) as HTMLDivElement;
+      clone.setAttribute("data-exporting", "true");
+      clone.style.position = "fixed";
+      clone.style.left = "-99999px";
+      clone.style.top = "0";
+      clone.style.width = `${tierListRef.current.offsetWidth}px`;
+
+      // Add title header at top of exported image
+      const titleEl = document.createElement("div");
+      titleEl.textContent = title || "Tier List";
+      titleEl.style.fontSize = "24px";
+      titleEl.style.fontWeight = "bold";
+      titleEl.style.color = "white";
+      titleEl.style.textAlign = "center";
+      titleEl.style.padding = "16px 0 12px";
+      clone.insertBefore(titleEl, clone.firstChild);
+
+      document.body.appendChild(clone);
+
+      // html2canvas doesn't support object-fit:cover, so we pre-render each
+      // image onto a <canvas> at high resolution with cover-crop. html2canvas
+      // copies canvas pixels directly, preserving full quality.
+      const origImgs = tierListRef.current.querySelectorAll<HTMLImageElement>(".export-img");
+      const cloneImgs = clone.querySelectorAll<HTMLImageElement>(".export-img");
+
+      // Reload each image with CORS enabled so we can draw to canvas
+      const loadedImages = await Promise.all(
+        Array.from(origImgs).map(
+          (img) =>
+            new Promise<HTMLImageElement>((resolve) => {
+              const corsImg = new Image();
+              corsImg.crossOrigin = "anonymous";
+              corsImg.onload = () => resolve(corsImg);
+              corsImg.onerror = () => resolve(img); // fallback to original
+              corsImg.src = img.src;
+            })
+        )
+      );
+
+      cloneImgs.forEach((cloneImg, i) => {
+        const srcImg = loadedImages[i];
+        const tile = cloneImg.closest(".export-tile");
+        if (!tile) return;
+        const tileEl = tile as HTMLElement;
+        const tw = tileEl.offsetWidth;
+        const th = tileEl.offsetHeight;
+        const nw = srcImg.naturalWidth || tw;
+        const nh = srcImg.naturalHeight || th;
+
+        // Create a high-res canvas that simulates object-fit:cover
+        const cvs = document.createElement("canvas");
+        cvs.width = tw * renderScale;
+        cvs.height = th * renderScale;
+        cvs.style.width = `${tw}px`;
+        cvs.style.height = `${th}px`;
+        const ctx = cvs.getContext("2d");
+        if (ctx) {
+          try {
+            // Compute cover-crop source rect
+            const scale = Math.max(tw / nw, th / nh);
+            const sw = tw / scale;
+            const sh = th / scale;
+            const sx = (nw - sw) / 2;
+            const sy = (nh - sh) / 2;
+            ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, cvs.width, cvs.height);
+            cloneImg.parentNode?.replaceChild(cvs, cloneImg);
+          } catch {
+            // If drawImage fails (CORS), leave the original img in place
+          }
+        }
       });
 
-      await new Promise((r) => setTimeout(r, 100));
-
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(tierListRef.current, {
+      const canvas = await html2canvas(clone, {
         backgroundColor: "#1a1a2e",
-        scale: 3,
+        scale: renderScale,
         useCORS: true,
         allowTaint: true,
       });
 
-      // Restore original <img> elements
-      replacements.forEach(({ img, div }) => {
-        div.parentNode?.removeChild(div);
-        img.style.display = "";
-      });
-      tierListRef.current.removeAttribute("data-exporting");
+      document.body.removeChild(clone);
 
       const link = document.createElement("a");
       link.download = `${title || "tierlist"}.png`;
@@ -589,12 +638,8 @@ export default function TierListEditor({
       link.click();
       toast.success("Exported as PNG!");
     } catch {
-      // Restore on error
-      replacements.forEach(({ img, div }) => {
-        div.parentNode?.removeChild(div);
-        img.style.display = "";
-      });
-      tierListRef.current?.removeAttribute("data-exporting");
+      // Clean up clone if it's still in the DOM
+      document.querySelector("[data-exporting]")?.remove();
       toast.error("Failed to export");
     } finally {
       setExporting(false);
