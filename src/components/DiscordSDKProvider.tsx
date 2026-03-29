@@ -24,8 +24,6 @@ export default function DiscordSDKProvider({
 }: {
   children: React.ReactNode;
 }) {
-  console.log("DiscordSDKProvider rendering");
-
   return (
     <DiscordSDKContext.Provider value={sdk}>
       {children}

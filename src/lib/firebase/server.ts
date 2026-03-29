@@ -33,11 +33,13 @@ export async function getAuthenticatedAppForUser() {
   const currentUser = auth.currentUser;
 
   // Ensure user document exists in Firestore
-  if (currentUser) {
-    await adminDb.doc(`users/${currentUser.uid}`).set(
-      { name: currentUser.displayName || "" },
-      { merge: true }
-    );
+  if (currentUser !== null) {
+    const userDoc = await adminDb.doc(`users/${currentUser.uid}`).get();
+    if (!userDoc.exists) {
+      await adminDb.doc(`users/${currentUser.uid}`).set({
+        name: currentUser.displayName || currentUser.uid,
+      });
+    }
   }
 
   return { firebaseServerApp, currentUser };
