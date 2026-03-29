@@ -24,7 +24,7 @@ import { tierlistConverter, type TierlistDoc } from "./converters/tierlist";
 import { tierlistTierConverter, type TierlistTierDoc } from "./converters/tierlist-tier";
 import { tierlistItemConverter, type TierlistItemDoc } from "./converters/tierlist-item";
 import { liveSessionConverter, liveSessionUserConverter } from "./converters/live-session";
-import { userConverter } from "./converters/user";
+import { userConverter, type UserDoc } from "./converters/user";
 
 const generateId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 25);
 const generateCode = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
@@ -57,9 +57,29 @@ function userDoc(uid: string) {
 
 // ── User ───────────────────────────────────────────────────────────────
 
-export async function ensureUserDocument(uid: string, name: string) {
+export async function ensureUserDocument(uid: string, name: string, hasCustomName: boolean = false) {
     const userRef = doc(db, "users", uid).withConverter(userConverter);
-    await setDoc(userRef, { name }, { merge: true });
+    const existing = await getDoc(userRef);
+    if (existing.exists()) {
+        // Only update the name if not already custom-named (unless this call is setting a custom name)
+        const data = existing.data()!;
+        if (!data.hasCustomName || hasCustomName) {
+            await setDoc(userRef, { name, hasCustomName: data.hasCustomName || hasCustomName }, { merge: true });
+        }
+    } else {
+        await setDoc(userRef, { name, hasCustomName }, { merge: true });
+    }
+}
+
+export async function getUserDocument(uid: string): Promise<UserDoc | null> {
+    const userRef = doc(db, "users", uid).withConverter(userConverter);
+    const snapshot = await getDoc(userRef);
+    return snapshot.exists() ? snapshot.data()! : null;
+}
+
+export async function updateUserDisplayName(uid: string, name: string) {
+    const userRef = doc(db, "users", uid).withConverter(userConverter);
+    await setDoc(userRef, { name, hasCustomName: true }, { merge: true });
 }
 
 // ── Tier List CRUD ─────────────────────────────────────────────────────

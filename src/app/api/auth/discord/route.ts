@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase/admin";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 
 export async function POST(req: NextRequest) {
   const { code } = (await req.json()) as {
@@ -49,6 +49,12 @@ export async function POST(req: NextRequest) {
     });
     uid = created.uid;
   }
+
+  // Store Discord username in Firestore with hasCustomName flag
+  await adminDb.doc(`users/${uid}`).set(
+    { name: user.username, hasCustomName: true },
+    { merge: true },
+  );
 
   const customToken = await adminAuth.createCustomToken(uid);
 

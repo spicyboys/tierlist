@@ -10,6 +10,8 @@ import {
 import { type DiscordSDK } from "@discord/embedded-app-sdk";
 import { useDiscordSDK } from "./DiscordSDKProvider";
 import { deleteSessionCookie, setSessionCookie } from "@/lib/session";
+import { getUserDocument, updateUserDisplayName } from "@/lib/firestore";
+import DisplayNameModal from "./DisplayNameModal";
 
 interface User {
   id: string;
@@ -50,9 +52,12 @@ function useUserSession(initialUser: User | null) {
       if (firebaseUser) {
         const idToken = await firebaseUser.getIdToken();
         await setSessionCookie(idToken);
+
+        // Read name from Firestore (may be a custom name)
+        const userDoc = await getUserDocument(firebaseUser.uid);
         setUser({
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || "",
+          name: userDoc?.name || firebaseUser.displayName || "",
         });
       } else {
         await deleteSessionCookie();
@@ -61,7 +66,7 @@ function useUserSession(initialUser: User | null) {
     });
   }, []);
 
-  return user;
+  return [user, setUser] as const;
 }
 
 export default function PageHeader({
@@ -69,7 +74,8 @@ export default function PageHeader({
 }: {
   initialUser: User | null;
 }) {
-  const user = useUserSession(initialUser);
+  const [user, setUser] = useUserSession(initialUser);
+  const [showNameModal, setShowNameModal] = useState(false);
 
   const discordSdk = useDiscordSDK();
   const discordAuthStarted = useRef(false);
@@ -89,12 +95,28 @@ export default function PageHeader({
     [],
   );
 
+  const handleNameSave = useCallback(
+    async (newName: string) => {
+      if (!user) return;
+      await updateUserDisplayName(user.id, newName);
+      setUser({ ...user, name: newName });
+      setShowNameModal(false);
+    },
+    [user, setUser],
+  );
+
   const [userInfo, setUserInfo] = useState<JSX.Element | null>(null);
   useEffect(() => {
     if (user) {
       setUserInfo(
         <>
-          <span className="text-sm text-gray-400">{user.name}</span>
+          <button
+            onClick={() => setShowNameModal(true)}
+            className="text-sm text-gray-400 hover:text-white transition cursor-pointer"
+            title="Change display name"
+          >
+            {user.name}
+          </button>
           <Link
             href="/dashboard"
             className="text-sm text-gray-400 hover:text-white transition"
@@ -113,11 +135,20 @@ export default function PageHeader({
   }, [user, discordSdk, handleSignIn]);
 
   return (
-    <nav className="border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-      <span className="text-lg font-bold">
-        <Link href="/">TierMaker</Link>
-      </span>
-      <div className="flex items-center gap-3">{userInfo}</div>
-    </nav>
+    <>
+      <nav className="border-b border-gray-800 px-4 py-3 flex items-center justify-between">
+        <span className="text-lg font-bold">
+          <Link href="/">TierMaker</Link>
+        </span>
+        <div className="flex items-center gap-3">{userInfo}</div>
+      </nav>
+      {showNameModal && user && (
+        <DisplayNameModal
+          currentName={user.name}
+          onSave={handleNameSave}
+          onClose={() => setShowNameModal(false)}
+        />
+      )}
+    </>
   );
 }
