@@ -6,33 +6,38 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 import { User as FirebaseUser } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
-import { onAuthStateChanged } from "@/lib/firebase/auth";
+import {
+  onIdTokenChanged,
+  signInWithCustomToken,
+  signInWithGoogle,
+} from "@/lib/firebase/auth";
 import {
   ensureUserDocument,
   getUserDocument,
   updateUserDisplayName,
 } from "@/lib/firestore";
-
-interface AppUser {
-  id: string;
-  name: string;
-}
+import { deleteSessionCookie, setSessionCookie } from "@/lib/session";
+import { type DiscordSDK } from "@discord/embedded-app-sdk";
+import { useDiscordSDK } from "./DiscordSDKProvider";
+import { type UserDoc } from "@/lib/firestore/converters/user";
 
 interface UserContextValue {
-  user: AppUser | null;
+  user: UserDoc | null;
   setDisplayName: (name: string) => Promise<void>;
+  signIn: () => void;
 }
 
 const UserContext = createContext<UserContextValue>({
   user: null,
   setDisplayName: async () => {},
+  signIn: () => {},
 });
 
-export function useUser(): AppUser | null {
+export function useUser(): UserDoc | null {
   return useContext(UserContext).user;
 }
 
@@ -40,15 +45,51 @@ export function useSetDisplayName(): (name: string) => Promise<void> {
   return useContext(UserContext).setDisplayName;
 }
 
-export default function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(() => {
-    const u = auth.currentUser;
-    return u ? { id: u.uid, name: u.displayName || "" } : null;
+export function useSignIn(): () => void {
+  return useContext(UserContext).signIn;
+}
+
+async function userFromDiscord(discordSdk: DiscordSDK) {
+  await discordSdk.ready();
+  const { code } = await discordSdk.commands.authorize({
+    client_id: process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!,
+    response_type: "code",
+    state: "",
+    prompt: "none",
+    scope: ["identify", "applications.commands", "email"],
   });
 
+  const response = await fetch("/api/auth/discord", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      code,
+    }),
+  });
+
+  const data = (await response.json()) as { customToken: string };
+
+  // Sign in to Firebase Auth with the custom token
+  await signInWithCustomToken(data.customToken);
+}
+
+export default function AuthProvider({
+  initialUser,
+  children,
+}: {
+  initialUser: UserDoc | null;
+  children: ReactNode;
+}) {
+  const [user, setUser] = useState(initialUser);
+
   useEffect(() => {
-    return onAuthStateChanged(async (firebaseUser: FirebaseUser | null) => {
+    return onIdTokenChanged(async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        const idToken = await firebaseUser.getIdToken();
+        await setSessionCookie(idToken);
+
         // Ensure Firestore user document exists
         await ensureUserDocument(
           firebaseUser.uid,
@@ -57,16 +98,28 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
         // Read the name from Firestore (may be a custom name)
         const userDoc = await getUserDocument(firebaseUser.uid);
-        const appUser: AppUser = {
+        setUser({
           id: firebaseUser.uid,
           name: userDoc?.name || firebaseUser.displayName || "",
-        };
-        setUser(appUser);
+          hasCustomName: userDoc?.hasCustomName ?? false,
+        });
       } else {
+        await deleteSessionCookie();
         setUser(null);
       }
     });
   }, []);
+
+  // Auto-authenticate via Discord if in Discord environment
+  const discordSdk = useDiscordSDK();
+  const discordAuthStarted = useRef(false);
+  useEffect(() => {
+    if (user !== null) return;
+    if (!discordSdk) return;
+    if (discordAuthStarted.current) return;
+    discordAuthStarted.current = true;
+    userFromDiscord(discordSdk);
+  }, [discordSdk, user]);
 
   const setDisplayName = useCallback(
     async (name: string) => {
@@ -77,8 +130,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const signIn = useCallback(() => {
+    signInWithGoogle();
+  }, []);
+
   return (
-    <UserContext.Provider value={{ user, setDisplayName }}>
+    <UserContext.Provider value={{ user, setDisplayName, signIn }}>
       {children}
     </UserContext.Provider>
   );

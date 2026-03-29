@@ -5,6 +5,7 @@ import { initializeServerApp, initializeApp } from "firebase/app";
 
 import { getAuth } from "firebase/auth";
 import { adminDb } from "@/lib/firebase/admin";
+import type { UserDoc } from "../firestore/converters/user";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -32,15 +33,26 @@ export async function getAuthenticatedAppForUser() {
 
   const currentUser = auth.currentUser;
 
-  // Ensure user document exists in Firestore
+  let user: UserDoc | null = null;
+
   if (currentUser !== null) {
     const userDoc = await adminDb.doc(`users/${currentUser.uid}`).get();
-    if (!userDoc.exists) {
+    if (userDoc.exists) {
+      const data = userDoc.data()!;
+      user = {
+        id: currentUser.uid,
+        name: data.name ?? currentUser.displayName ?? currentUser.uid,
+        hasCustomName: data.hasCustomName ?? false,
+      };
+    } else {
+      const name = currentUser.displayName || currentUser.uid;
       await adminDb.doc(`users/${currentUser.uid}`).set({
-        name: currentUser.displayName || currentUser.uid,
+        name,
+        hasCustomName: false,
       });
+      user = { id: currentUser.uid, name, hasCustomName: false };
     }
   }
 
-  return { firebaseServerApp, currentUser };
+  return { firebaseServerApp, currentUser: user };
 }

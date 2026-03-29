@@ -33,17 +33,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-950`}
       >
-        <Providers>
+        <Providers initialUser={currentUser}>
           <div className="min-h-screen bg-gray-950 text-white">
-            <PageHeader
-              initialUser={
-                // Map Firebase User to our app's User type. We need to do this or we get an infinite loop
-                // from the user serialization.
-                currentUser
-                  ? { id: currentUser.uid, name: currentUser.displayName || "" }
-                  : null
-              }
-            />
+            <PageHeader />
             {children}
           </div>
         </Providers>

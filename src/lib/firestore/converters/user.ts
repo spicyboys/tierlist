@@ -5,6 +5,7 @@ import {
 } from "firebase/firestore";
 
 export interface UserDoc {
+  id: string;
   name: string;
   hasCustomName: boolean;
 }
@@ -18,6 +19,10 @@ export const userConverter: FirestoreDataConverter<UserDoc> = {
     options?: SnapshotOptions,
   ): UserDoc {
     const data = snapshot.data(options);
-    return { name: data.name, hasCustomName: data.hasCustomName ?? false };
+    return {
+      id: snapshot.id,
+      name: data.name,
+      hasCustomName: data.hasCustomName ?? false,
+    };
   },
 };

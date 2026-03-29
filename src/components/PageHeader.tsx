@@ -1,108 +1,32 @@
 "use client";
 
-import { JSX, useCallback, useEffect, useRef, useState } from "react";
+import { JSX, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  onIdTokenChanged,
-  signInWithCustomToken,
-  signInWithGoogle,
-} from "@/lib/firebase/auth";
-import { type DiscordSDK } from "@discord/embedded-app-sdk";
+import { useUser, useSetDisplayName, useSignIn } from "./AuthProvider";
 import { useDiscordSDK } from "./DiscordSDKProvider";
-import { deleteSessionCookie, setSessionCookie } from "@/lib/session";
-import { getUserDocument, updateUserDisplayName } from "@/lib/firestore";
 import DisplayNameModal from "./DisplayNameModal";
 
-interface User {
-  id: string;
-  name: string;
-}
-
-async function userFromDiscord(discordSdk: DiscordSDK) {
-  await discordSdk.ready();
-  const { code } = await discordSdk.commands.authorize({
-    client_id: process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!,
-    response_type: "code",
-    state: "",
-    prompt: "none",
-    scope: ["identify", "applications.commands", "email"],
-  });
-
-  const response = await fetch("/api/auth/discord", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      code,
-    }),
-  });
-
-  const data = (await response.json()) as { customToken: string };
-
-  // Sign in to Firebase Auth with the custom token
-  await signInWithCustomToken(data.customToken);
-}
-
-function useUserSession(initialUser: User | null) {
-  const [user, setUser] = useState<User | null>(initialUser);
-
-  useEffect(() => {
-    return onIdTokenChanged(async (firebaseUser) => {
-      if (firebaseUser) {
-        const idToken = await firebaseUser.getIdToken();
-        await setSessionCookie(idToken);
-
-        // Read name from Firestore (may be a custom name)
-        const userDoc = await getUserDocument(firebaseUser.uid);
-        setUser({
-          id: firebaseUser.uid,
-          name: userDoc?.name || firebaseUser.displayName || "",
-        });
-      } else {
-        await deleteSessionCookie();
-        setUser(null);
-      }
-    });
-  }, []);
-
-  return [user, setUser] as const;
-}
-
-export default function PageHeader({
-  initialUser,
-}: {
-  initialUser: User | null;
-}) {
-  const [user, setUser] = useUserSession(initialUser);
-  const [showNameModal, setShowNameModal] = useState(false);
-
+export default function PageHeader() {
+  const user = useUser();
+  const setDisplayName = useSetDisplayName();
+  const signIn = useSignIn();
   const discordSdk = useDiscordSDK();
-  const discordAuthStarted = useRef(false);
-  useEffect(() => {
-    if (user !== null) return;
-    if (!discordSdk) return;
-    if (discordAuthStarted.current) return;
-    discordAuthStarted.current = true;
-    userFromDiscord(discordSdk);
-  }, [discordSdk, user]);
+  const [showNameModal, setShowNameModal] = useState(false);
 
   const handleSignIn = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      signInWithGoogle();
+      signIn();
     },
-    [],
+    [signIn],
   );
 
   const handleNameSave = useCallback(
     async (newName: string) => {
-      if (!user) return;
-      await updateUserDisplayName(user.id, newName);
-      setUser({ ...user, name: newName });
+      await setDisplayName(newName);
       setShowNameModal(false);
     },
-    [user, setUser],
+    [setDisplayName],
   );
 
   const [userInfo, setUserInfo] = useState<JSX.Element | null>(null);
