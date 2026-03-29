@@ -42,6 +42,7 @@ export default function ItemTile({
           alt={item.title}
           className="w-full h-full object-cover export-img"
           draggable={false}
+          referrerPolicy="no-referrer"
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-200 p-1 text-center leading-tight bg-gray-700">
