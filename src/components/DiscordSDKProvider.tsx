@@ -9,11 +9,19 @@ export function useDiscordSDK() {
   return use(DiscordSDKContext);
 }
 
+const ORIGIN_WHITELIST = [
+  "https://cdn.discordapp.com",
+  "https://upload.wikimedia.org",
+];
+
 export function useImageProxy() {
   const discordSdk = use(DiscordSDKContext);
   if (!discordSdk) return (url: string | null) => url;
   return (url: string | null) => {
     if (!url) return null;
+    if (!ORIGIN_WHITELIST.includes(new URL(url).origin)) {
+      return url; // Don't proxy if not in whitelist
+    }
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   };
 }
@@ -23,6 +31,7 @@ try {
   sdk = new DiscordSDK(process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!);
   patchUrlMappings([
     { prefix: "/googleapis/{subdomain}", target: "{subdomain}.googleapis.com" },
+    { prefix: "/wikimedia", target: "upload.wikimedia.org" },
   ]);
 } catch {
   // Not in a discord environment
