@@ -46,7 +46,7 @@ interface TierListEditorProps {
   onItemMoved?: (
     itemId: string,
     targetTierId: string | null,
-    newOrder: number
+    newOrder: number,
   ) => void | Promise<void>;
   onItemRemoved?: (itemId: string) => void;
   onDragBroadcast?: (itemId: string | null) => void;
@@ -64,8 +64,7 @@ const tierListCollision: CollisionDetection = (args) => {
     // Prefer item collisions over container collisions (tier-xxx, unsorted)
     // so that same-container reordering works
     const items = pw.filter(
-      (c) =>
-        !String(c.id).startsWith("tier-") && String(c.id) !== "unsorted"
+      (c) => !String(c.id).startsWith("tier-") && String(c.id) !== "unsorted",
     );
     if (items.length > 0) {
       // Use closestCenter among the item hits for precision
@@ -73,7 +72,7 @@ const tierListCollision: CollisionDetection = (args) => {
       const filteredArgs = {
         ...args,
         droppableContainers: args.droppableContainers.filter((c) =>
-          itemIds.has(String(c.id))
+          itemIds.has(String(c.id)),
         ),
       };
       const cc = closestCenter(filteredArgs);
@@ -101,8 +100,9 @@ function UnsortedPool({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-[#1a1a2e] min-h-[80px] sm:min-h-[100px] ${isOver ? "bg-white/5" : ""
-        }`}
+      className={`bg-[#1a1a2e] min-h-[80px] sm:min-h-[100px] ${
+        isOver ? "bg-white/5" : ""
+      }`}
     >
       <SortableContext
         items={items.map((i) => i.id)}
@@ -155,7 +155,7 @@ function useRecommendations(title: string, allItems: TierItem[]) {
         results?: Array<{ url: string; thumbnail: string; title: string }>;
       };
       const existingTitles = new Set(
-        allItems.map((i) => i.title.toLowerCase())
+        allItems.map((i) => i.title.toLowerCase()),
       );
       const recs = (data.results || [])
         .filter((r) => !existingTitles.has(r.title.toLowerCase()))
@@ -169,7 +169,13 @@ function useRecommendations(title: string, allItems: TierItem[]) {
     }
   }, [title, allItems]);
 
-  return { suggestions, loading, fetched, fetchRecommendations, setSuggestions };
+  return {
+    suggestions,
+    loading,
+    fetched,
+    fetchRecommendations,
+    setSuggestions,
+  };
 }
 
 export default function TierListEditor({
@@ -190,7 +196,7 @@ export default function TierListEditor({
   const [title, setTitle] = useState(initialData.title);
   const [tiers, setTiers] = useState<TierData[]>(initialData.tiers);
   const [unsortedItems, setUnsortedItems] = useState<TierItem[]>(
-    initialData.unsortedItems
+    initialData.unsortedItems,
   );
   const [activeItem, setActiveItem] = useState<TierItem | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -205,16 +211,24 @@ export default function TierListEditor({
   // Wrapped setters that update refs SYNCHRONOUSLY before setState
   // This is critical because dnd-kit may fire handleDragOver and handleDragEnd
   // in the same event, and handleDragEnd needs to read from refs immediately.
-  const setTiersWrapped = useCallback((updater: TierData[] | ((prev: TierData[]) => TierData[])) => {
-    const next = typeof updater === "function" ? updater(tiersRef.current) : updater;
-    tiersRef.current = next;
-    setTiers(next);
-  }, []);
-  const setUnsortedWrapped = useCallback((updater: TierItem[] | ((prev: TierItem[]) => TierItem[])) => {
-    const next = typeof updater === "function" ? updater(unsortedRef.current) : updater;
-    unsortedRef.current = next;
-    setUnsortedItems(next);
-  }, []);
+  const setTiersWrapped = useCallback(
+    (updater: TierData[] | ((prev: TierData[]) => TierData[])) => {
+      const next =
+        typeof updater === "function" ? updater(tiersRef.current) : updater;
+      tiersRef.current = next;
+      setTiers(next);
+    },
+    [],
+  );
+  const setUnsortedWrapped = useCallback(
+    (updater: TierItem[] | ((prev: TierItem[]) => TierItem[])) => {
+      const next =
+        typeof updater === "function" ? updater(unsortedRef.current) : updater;
+      unsortedRef.current = next;
+      setUnsortedItems(next);
+    },
+    [],
+  );
 
   // All items for recommendations
   const allItems = useMemo(() => {
@@ -248,13 +262,11 @@ export default function TierListEditor({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, {
       activationConstraint: { delay: 200, tolerance: 5 },
-    })
+    }),
   );
 
   const findItem = useCallback(
-    (
-      id: string
-    ): { item: TierItem; source: "unsorted" | string } | null => {
+    (id: string): { item: TierItem; source: "unsorted" | string } | null => {
       const unsorted = unsortedRef.current.find((i) => i.id === id);
       if (unsorted) return { item: unsorted, source: "unsorted" };
       for (const tier of tiersRef.current) {
@@ -263,21 +275,18 @@ export default function TierListEditor({
       }
       return null;
     },
-    []
+    [],
   );
 
-  const getContainerId = useCallback(
-    (id: string): string | null => {
-      if (id === "unsorted") return "unsorted";
-      if (id.startsWith("tier-")) return id.replace("tier-", "");
-      if (unsortedRef.current.some((i) => i.id === id)) return "unsorted";
-      for (const tier of tiersRef.current) {
-        if (tier.items.some((i) => i.id === id)) return tier.id;
-      }
-      return null;
-    },
-    []
-  );
+  const getContainerId = useCallback((id: string): string | null => {
+    if (id === "unsorted") return "unsorted";
+    if (id.startsWith("tier-")) return id.replace("tier-", "");
+    if (unsortedRef.current.some((i) => i.id === id)) return "unsorted";
+    for (const tier of tiersRef.current) {
+      if (tier.items.some((i) => i.id === id)) return tier.id;
+    }
+    return null;
+  }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
     isDraggingRef.current = true;
@@ -329,7 +338,7 @@ export default function TierListEditor({
             const [moved] = items.splice(oldIndex, 1);
             items.splice(newIndex, 0, moved);
             return { ...tier, items };
-          })
+          }),
         );
       }
       return;
@@ -346,8 +355,8 @@ export default function TierListEditor({
         prev.map((tier) =>
           tier.id === activeContainer
             ? { ...tier, items: tier.items.filter((i) => i.id !== activeId) }
-            : tier
-        )
+            : tier,
+        ),
       );
     }
 
@@ -362,7 +371,7 @@ export default function TierListEditor({
           if (tier.id !== overContainer) return tier;
           if (tier.items.some((i) => i.id === item.id)) return tier;
           return { ...tier, items: [...tier.items, item] };
-        })
+        }),
       );
     }
   };
@@ -407,7 +416,7 @@ export default function TierListEditor({
       const result = onItemMoved(
         activeId,
         resolvedContainer === "unsorted" ? null : resolvedContainer,
-        resolvedIndex
+        resolvedIndex,
       );
       if (result && typeof result.then === "function") {
         result.finally(() => {
@@ -438,7 +447,7 @@ export default function TierListEditor({
       prev.map((tier) => ({
         ...tier,
         items: tier.items.filter((i) => i.id !== itemId),
-      }))
+      })),
     );
     onItemRemoved?.(itemId);
   };
@@ -452,15 +461,15 @@ export default function TierListEditor({
 
   const handleSaveEditedItem = (updatedItem: TierItem) => {
     setUnsortedWrapped((prev) =>
-      prev.map((i) => (i.id === updatedItem.id ? updatedItem : i))
+      prev.map((i) => (i.id === updatedItem.id ? updatedItem : i)),
     );
     setTiersWrapped((prev) =>
       prev.map((tier) => ({
         ...tier,
         items: tier.items.map((i) =>
-          i.id === updatedItem.id ? updatedItem : i
+          i.id === updatedItem.id ? updatedItem : i,
         ),
-      }))
+      })),
     );
   };
 
@@ -477,9 +486,7 @@ export default function TierListEditor({
     setUnsortedWrapped((prev) => [...prev, newItem]);
     onItemAdded?.(newItem, null);
     // Remove from suggestions
-    setSuggestions((prev) =>
-      prev.filter((s) => s.title !== rec.title)
-    );
+    setSuggestions((prev) => prev.filter((s) => s.title !== rec.title));
   };
 
   const handleAddTier = () => {
@@ -503,7 +510,7 @@ export default function TierListEditor({
 
   const handleRenameTier = (tierId: string, label: string) => {
     setTiersWrapped((prev) =>
-      prev.map((t) => (t.id === tierId ? { ...t, label } : t))
+      prev.map((t) => (t.id === tierId ? { ...t, label } : t)),
     );
   };
 
@@ -574,7 +581,8 @@ export default function TierListEditor({
       // html2canvas doesn't support object-fit:cover, so we pre-render each
       // image onto a <canvas> at high resolution with cover-crop. html2canvas
       // copies canvas pixels directly, preserving full quality.
-      const origImgs = tierListRef.current.querySelectorAll<HTMLImageElement>(".export-img");
+      const origImgs =
+        tierListRef.current.querySelectorAll<HTMLImageElement>(".export-img");
       const cloneImgs = clone.querySelectorAll<HTMLImageElement>(".export-img");
 
       // Reload each image with CORS enabled so we can draw to canvas
@@ -587,8 +595,8 @@ export default function TierListEditor({
               corsImg.onload = () => resolve(corsImg);
               corsImg.onerror = () => resolve(img); // fallback to original
               corsImg.src = img.src;
-            })
-        )
+            }),
+        ),
       );
 
       cloneImgs.forEach((cloneImg, i) => {

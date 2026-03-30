@@ -143,16 +143,18 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
                   ? `Searching ${SOURCE_LABELS[source]}...`
                   : `Search ${SOURCE_LABELS[source]}`}
               </button>
-              {(source === "imgur" || source === "commons") && searched && results.length > 0 && (
-                <button
-                  onClick={handleShuffle}
-                  disabled={searching}
-                  className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition text-sm"
-                  title="Load more results"
-                >
-                  Shuffle
-                </button>
-              )}
+              {(source === "imgur" || source === "commons") &&
+                searched &&
+                results.length > 0 && (
+                  <button
+                    onClick={handleShuffle}
+                    disabled={searching}
+                    className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition text-sm"
+                    title="Load more results"
+                  >
+                    Shuffle
+                  </button>
+                )}
             </div>
 
             {searched && results.length > 0 && (

@@ -27,7 +27,11 @@ interface EditItemModalProps {
   onClose: () => void;
 }
 
-export default function EditItemModal({ item, onSave, onClose }: EditItemModalProps) {
+export default function EditItemModal({
+  item,
+  onSave,
+  onClose,
+}: EditItemModalProps) {
   const proxyUrl = useImageProxy();
   const [title, setTitle] = useState(item.title);
   const [imageUrl, setImageUrl] = useState(item.imageUrl);
@@ -163,16 +167,18 @@ export default function EditItemModal({ item, onSave, onClose }: EditItemModalPr
                   ? `Searching ${SOURCE_LABELS[source]}...`
                   : `Search ${SOURCE_LABELS[source]}`}
               </button>
-              {(source === "imgur" || source === "commons") && searched && results.length > 0 && (
-                <button
-                  onClick={handleShuffle}
-                  disabled={searching}
-                  className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition text-sm"
-                  title="Load more results"
-                >
-                  Shuffle
-                </button>
-              )}
+              {(source === "imgur" || source === "commons") &&
+                searched &&
+                results.length > 0 && (
+                  <button
+                    onClick={handleShuffle}
+                    disabled={searching}
+                    className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition text-sm"
+                    title="Load more results"
+                  >
+                    Shuffle
+                  </button>
+                )}
             </div>
 
             {searched && results.length > 0 && (
@@ -189,7 +195,9 @@ export default function EditItemModal({ item, onSave, onClose }: EditItemModalPr
                   {results.map((r, i) => (
                     <button
                       key={i}
-                      onClick={() => setImageUrl(imageUrl === r.url ? item.imageUrl : r.url)}
+                      onClick={() =>
+                        setImageUrl(imageUrl === r.url ? item.imageUrl : r.url)
+                      }
                       className={`aspect-square rounded overflow-hidden border-2 transition ${
                         imageUrl === r.url
                           ? "border-blue-500 ring-1 ring-blue-500"
