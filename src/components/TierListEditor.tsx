@@ -26,10 +26,12 @@ import TierRow from "./TierRow";
 import ItemTile from "./ItemTile";
 import AddItemModal from "./AddItemModal";
 import EditItemModal from "./EditItemModal";
+import VotePanel from "./VotePanel";
 import { useImageProxy, useDiscordSDK } from "./DiscordSDKProvider";
 import toast from "react-hot-toast";
 import { useDiscordAccessToken } from "./AuthProvider";
 import type { DiscordSDK } from "@discord/embedded-app-sdk";
+import { VoteState } from "@/lib/types";
 
 async function uploadAndShareMoment(
   canvas: HTMLCanvasElement,
@@ -83,6 +85,17 @@ interface TierListEditorProps {
   onItemRemoved?: (itemId: string) => void;
   onDragBroadcast?: (itemId: string | null) => void;
   dragIndicators?: DragIndicator[];
+  // Vote
+  vote?: VoteState | null;
+  currentUserId?: string;
+  totalLiveUsers?: number;
+  onStartVote?: (itemId: string, itemTitle: string) => void;
+  onSubmitVote?: (tier: string) => void;
+  onResolveVote?: (result: string) => void;
+  onClearVote?: () => void;
+  // Lock
+  isHost?: boolean;
+  onToggleLockItem?: (itemId: string, locked: boolean) => void;
 }
 
 let nextId = 1;
@@ -120,12 +133,20 @@ function UnsortedPool({
   items,
   onRemoveItem,
   onEditItem,
+  onVoteItem,
+  onToggleLockItem,
   dragIndicators,
+  isHost,
+  isLive,
 }: {
   items: TierItem[];
   onRemoveItem?: (id: string) => void;
   onEditItem?: (id: string) => void;
+  onVoteItem?: (id: string) => void;
+  onToggleLockItem?: (id: string) => void;
   dragIndicators?: DragIndicator[];
+  isHost?: boolean;
+  isLive?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "unsorted" });
 
@@ -147,9 +168,13 @@ function UnsortedPool({
               item={item}
               onRemove={onRemoveItem ? () => onRemoveItem(item.id) : undefined}
               onEdit={onEditItem ? () => onEditItem(item.id) : undefined}
+              onVote={onVoteItem ? () => onVoteItem(item.id) : undefined}
+              onToggleLock={onToggleLockItem ? () => onToggleLockItem(item.id) : undefined}
               draggedBy={
                 dragIndicators?.find((d) => d.itemId === item.id)?.userName
               }
+              isHost={isHost}
+              isLive={isLive}
             />
           ))}
           {items.length === 0 && (
@@ -223,6 +248,15 @@ export default function TierListEditor({
   onItemRemoved,
   onDragBroadcast,
   dragIndicators,
+  vote,
+  currentUserId,
+  totalLiveUsers,
+  onStartVote,
+  onSubmitVote,
+  onResolveVote,
+  onClearVote,
+  isHost,
+  onToggleLockItem,
 }: TierListEditorProps) {
   const proxyUrl = useImageProxy();
   const discordSdk = useDiscordSDK();
@@ -323,8 +357,9 @@ export default function TierListEditor({
   }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
-    isDraggingRef.current = true;
     const result = findItem(event.active.id as string);
+    if (result?.item.locked) return;
+    isDraggingRef.current = true;
     if (result) {
       setActiveItem(result.item);
       onDragBroadcast?.(event.active.id as string);
@@ -521,6 +556,26 @@ export default function TierListEditor({
     onItemAdded?.(newItem, null);
     // Remove from suggestions
     setSuggestions((prev) => prev.filter((s) => s.title !== rec.title));
+  };
+
+  const handleVoteItem = (itemId: string) => {
+    if (!onStartVote) return;
+    if (vote && !vote.result) {
+      toast.error("A vote is already in progress");
+      return;
+    }
+    const result = findItem(itemId);
+    if (result) {
+      onStartVote(itemId, result.item.title);
+    }
+  };
+
+  const handleToggleLockItem = (itemId: string) => {
+    if (!onToggleLockItem) return;
+    const result = findItem(itemId);
+    if (result) {
+      onToggleLockItem(itemId, !result.item.locked);
+    }
   };
 
   const handleAddTier = () => {
@@ -765,9 +820,10 @@ export default function TierListEditor({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
+        <div className="flex gap-3 mb-4 items-start">
         <div
           ref={tierListRef}
-          className="border-2 border-gray-950 overflow-hidden mb-4 bg-[#1a1a2e]"
+          className="border-2 border-gray-950 overflow-hidden bg-[#1a1a2e] flex-1 min-w-0"
         >
           {tiers.map((tier, idx) => (
             <TierRow
@@ -779,12 +835,29 @@ export default function TierListEditor({
               onMoveTierDown={() => handleMoveTier(tier.id, "down")}
               onRemoveItem={handleRemoveItem}
               onEditItem={handleEditItem}
+              onVoteItem={onStartVote ? handleVoteItem : undefined}
+              onToggleLockItem={isHost ? handleToggleLockItem : undefined}
               isFirst={idx === 0}
               isLast={idx === tiers.length - 1}
               canEditTiers={canEditTiers}
               dragIndicators={dragIndicators}
+              isHost={isHost}
+              isLive={!!liveSessionCode}
             />
           ))}
+        </div>
+
+        {/* Vote panel - right side of tiers */}
+        {liveSessionCode && vote !== undefined && currentUserId && (
+          <VotePanel
+            vote={vote}
+            currentUserId={currentUserId}
+            totalUsers={totalLiveUsers ?? 1}
+            onSubmitVote={onSubmitVote ?? (() => {})}
+            onResolveVote={onResolveVote ?? (() => {})}
+            onClearVote={onClearVote ?? (() => {})}
+          />
+        )}
         </div>
 
         {/* Add tier button */}
@@ -814,7 +887,11 @@ export default function TierListEditor({
             items={unsortedItems}
             onRemoveItem={handleRemoveItem}
             onEditItem={handleEditItem}
+            onVoteItem={onStartVote ? handleVoteItem : undefined}
+            onToggleLockItem={isHost ? handleToggleLockItem : undefined}
             dragIndicators={dragIndicators}
+            isHost={isHost}
+            isLive={!!liveSessionCode}
           />
         </div>
 

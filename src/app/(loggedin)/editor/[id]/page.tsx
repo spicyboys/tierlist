@@ -18,8 +18,15 @@ import {
   subscribeLiveSessionUsers,
   updatePresence,
   setDragState,
+  startVote,
+  submitVote,
+  resolveVote,
+  clearVote,
+  subscribeVote,
+  setItemLocked,
 } from "@/lib/firestore";
 import LiveUserBar, { LiveUser } from "@/components/LiveUserBar";
+import { VoteState } from "@/lib/types";
 
 export default function EditorPage({
   params,
@@ -34,6 +41,7 @@ export default function EditorPage({
   const [liveCode, setLiveCode] = useState<string | null>(null);
   const [liveUsers, setLiveUsers] = useState<LiveUser[]>([]);
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
+  const [vote, setVote] = useState<VoteState | null>(null);
   const isDraggingRef = useRef(false);
   const presenceRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -77,6 +85,10 @@ export default function EditorPage({
       setDragIndicators(indicators);
     });
 
+    const unsubVote = subscribeVote(liveCode, (voteState) => {
+      setVote(voteState);
+    });
+
     // Heartbeat for presence
     updatePresence(liveCode, user.id, user.name);
     presenceRef.current = setInterval(() => {
@@ -85,6 +97,7 @@ export default function EditorPage({
 
     return () => {
       unsub();
+      unsubVote();
       if (presenceRef.current) {
         clearInterval(presenceRef.current);
         presenceRef.current = null;
@@ -168,6 +181,42 @@ export default function EditorPage({
     [liveCode, user],
   );
 
+  const handleStartVote = useCallback(
+    (itemId: string, itemTitle: string) => {
+      if (!liveCode) return;
+      startVote(liveCode, itemId, itemTitle);
+    },
+    [liveCode],
+  );
+
+  const handleSubmitVote = useCallback(
+    (tier: string) => {
+      if (!liveCode || !user) return;
+      submitVote(liveCode, user.id, tier);
+    },
+    [liveCode, user],
+  );
+
+  const handleResolveVote = useCallback(
+    (result: string) => {
+      if (!liveCode) return;
+      resolveVote(liveCode, result);
+    },
+    [liveCode],
+  );
+
+  const handleClearVote = useCallback(() => {
+    if (!liveCode) return;
+    clearVote(liveCode);
+  }, [liveCode]);
+
+  const handleToggleLockItem = useCallback(
+    (itemId: string, locked: boolean) => {
+      setItemLocked(id, itemId, locked);
+    },
+    [id],
+  );
+
   if (!data) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -199,6 +248,15 @@ export default function EditorPage({
           onItemRemoved={liveCode ? handleLiveItemRemoved : undefined}
           onDragBroadcast={liveCode ? handleLiveDragBroadcast : undefined}
           dragIndicators={liveCode ? dragIndicators : undefined}
+          vote={liveCode ? vote : undefined}
+          currentUserId={user?.id}
+          totalLiveUsers={liveUsers.length}
+          onStartVote={liveCode ? handleStartVote : undefined}
+          onSubmitVote={liveCode ? handleSubmitVote : undefined}
+          onResolveVote={liveCode ? handleResolveVote : undefined}
+          onClearVote={liveCode ? handleClearVote : undefined}
+          isHost={true}
+          onToggleLockItem={handleToggleLockItem}
         />
       </main>
     </>

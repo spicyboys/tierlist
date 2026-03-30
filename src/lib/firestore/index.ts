@@ -18,7 +18,7 @@ import {
     Unsubscribe,
     Timestamp,
 } from "firebase/firestore";
-import { TierListData, TierData, TierItem } from "@/lib/types";
+import { TierListData, TierData, TierItem, VoteState } from "@/lib/types";
 import { customAlphabet } from "nanoid";
 import { tierlistConverter, type TierlistDoc } from "./converters/tierlist";
 import { tierlistTierConverter, type TierlistTierDoc } from "./converters/tierlist-tier";
@@ -283,6 +283,7 @@ export function subscribeTierList(
                             title: i.title,
                             imageUrl: i.imageUrl,
                             order: i.order,
+                            locked: i.locked ?? false,
                         })),
                 }));
 
@@ -294,6 +295,7 @@ export function subscribeTierList(
                     title: i.title,
                     imageUrl: i.imageUrl,
                     order: i.order,
+                    locked: i.locked ?? false,
                 }));
 
             callback({
@@ -528,4 +530,72 @@ export function subscribeGuildSessions(
         );
         callback(sessions);
     });
+}
+
+// ── Voting ────────────────────────────────────────────────────────────
+
+function voteDoc(code: string) {
+    return doc(db, "liveSessions", code, "vote", "current");
+}
+
+export async function startVote(
+    code: string,
+    itemId: string,
+    itemTitle: string,
+) {
+    await setDoc(voteDoc(code), {
+        itemId,
+        itemTitle,
+        startedAt: Date.now(),
+        responses: {},
+        result: null,
+    });
+}
+
+export async function submitVote(
+    code: string,
+    userId: string,
+    tier: string,
+) {
+    await updateDoc(voteDoc(code), {
+        [`responses.${userId}`]: tier,
+    });
+}
+
+export async function resolveVote(code: string, result: string) {
+    await updateDoc(voteDoc(code), { result });
+}
+
+export async function clearVote(code: string) {
+    await deleteDoc(voteDoc(code));
+}
+
+export function subscribeVote(
+    code: string,
+    callback: (vote: VoteState | null) => void,
+): Unsubscribe {
+    return onSnapshot(voteDoc(code), (snapshot) => {
+        if (!snapshot.exists()) {
+            callback(null);
+            return;
+        }
+        const data = snapshot.data();
+        callback({
+            itemId: data.itemId,
+            itemTitle: data.itemTitle,
+            startedAt: data.startedAt,
+            responses: data.responses ?? {},
+            result: data.result ?? null,
+        });
+    });
+}
+
+// ── Item Locking ──────────────────────────────────────────────────────
+
+export async function setItemLocked(
+    tierlistId: string,
+    itemId: string,
+    locked: boolean,
+) {
+    await updateDoc(doc(itemsCol(tierlistId), itemId), { locked });
 }

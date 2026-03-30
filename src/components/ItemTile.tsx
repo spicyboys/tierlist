@@ -9,16 +9,24 @@ interface ItemTileProps {
   item: TierItem;
   onRemove?: () => void;
   onEdit?: () => void;
+  onVote?: () => void;
+  onToggleLock?: () => void;
   overlay?: boolean;
   draggedBy?: string;
+  isHost?: boolean;
+  isLive?: boolean;
 }
 
 export default function ItemTile({
   item,
   onRemove,
   onEdit,
+  onVote,
+  onToggleLock,
   overlay,
   draggedBy,
+  isHost,
+  isLive,
 }: ItemTileProps) {
   const proxyUrl = useImageProxy();
   const {
@@ -28,7 +36,7 @@ export default function ItemTile({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id });
+  } = useSortable({ id: item.id, disabled: !!item.locked });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -73,10 +81,16 @@ export default function ItemTile({
       style={style}
       {...attributes}
       {...listeners}
-      className={`export-tile w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] overflow-hidden bg-gray-700 cursor-grab active:cursor-grabbing relative flex-shrink-0 group touch-none ${
+      className={`export-tile w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] overflow-hidden bg-gray-700 relative flex-shrink-0 group touch-none ${
+        item.locked
+          ? "cursor-not-allowed border-2 border-yellow-600/50 opacity-90"
+          : "cursor-grab active:cursor-grabbing"
+      } ${
         draggedBy
           ? "border-2 border-yellow-400 ring-1 ring-yellow-400/50 animate-pulse"
-          : "border border-gray-900/50 hover:brightness-110 hover:z-10"
+          : item.locked
+            ? ""
+            : "border border-gray-900/50 hover:brightness-110 hover:z-10"
       }`}
     >
       {content}
@@ -85,9 +99,27 @@ export default function ItemTile({
           {draggedBy}
         </div>
       )}
-      {!draggedBy && (onRemove || onEdit) && (
+      {/* Lock indicator */}
+      {item.locked && (
+        <div className="absolute top-0 left-0 bg-yellow-600 text-black text-[9px] w-4 h-4 flex items-center justify-center z-20" title="Locked">
+          🔒
+        </div>
+      )}
+      {!draggedBy && (onRemove || onEdit || onVote || onToggleLock) && (
         <div className="export-hide absolute top-0 right-0 flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
-          {onEdit && (
+          {isLive && onVote && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onVote();
+              }}
+              className="bg-amber-600 text-white text-[10px] w-5 h-5 sm:w-4 sm:h-4 flex items-center justify-center"
+              title="Start vote"
+            >
+              ⚖
+            </button>
+          )}
+          {onEdit && !item.locked && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -99,7 +131,19 @@ export default function ItemTile({
               ✎
             </button>
           )}
-          {onRemove && (
+          {isHost && isLive && onToggleLock && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLock();
+              }}
+              className={`text-white text-[10px] w-5 h-5 sm:w-4 sm:h-4 flex items-center justify-center ${item.locked ? "bg-yellow-600" : "bg-gray-500"}`}
+              title={item.locked ? "Unlock" : "Lock"}
+            >
+              {item.locked ? "🔓" : "🔒"}
+            </button>
+          )}
+          {onRemove && !item.locked && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

@@ -91,6 +91,15 @@ service cloud.firestore {
           && get(resource.data.tierlist).data.owner
              == /databases/$(database)/documents/users/$(request.auth.uid);
 
+      // ── Vote subcollection ──────────────────────────────────────
+      match /vote/{voteId} {
+        // Anyone can read vote state
+        allow read: if true;
+
+        // Anyone in the session can create/update/delete votes
+        allow create, update, delete: if true;
+      }
+
       // ── Presence subcollection ───────────────────────────────────
       match /users/{odOrGuestId} {
         // Anyone can read presence (needed to see who's in the session)

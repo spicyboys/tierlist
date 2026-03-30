@@ -10,6 +10,7 @@ export interface TierlistItemDoc {
   imageUrl: string | null;
   order: number;
   tier: DocumentReference | null;
+  locked?: boolean;
 }
 
 export const tierlistItemConverter: FirestoreDataConverter<TierlistItemDoc> = {
@@ -19,6 +20,7 @@ export const tierlistItemConverter: FirestoreDataConverter<TierlistItemDoc> = {
       imageUrl: item.imageUrl,
       order: item.order,
       tier: item.tier,
+      locked: item.locked ?? false,
     };
   },
   fromFirestore(
@@ -31,6 +33,7 @@ export const tierlistItemConverter: FirestoreDataConverter<TierlistItemDoc> = {
       imageUrl: data.imageUrl ?? null,
       order: data.order,
       tier: data.tier ?? null,
+      locked: data.locked ?? false,
     };
   },
 };

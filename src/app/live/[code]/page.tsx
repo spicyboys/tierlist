@@ -16,9 +16,15 @@ import {
   removeTierListItem,
   updatePresence,
   setDragState,
+  startVote,
+  submitVote,
+  resolveVote,
+  clearVote,
+  subscribeVote,
 } from "@/lib/firestore";
 import { customAlphabet } from "nanoid";
 import LiveUserBar from "@/components/LiveUserBar";
+import { VoteState } from "@/lib/types";
 
 const generateGuestId = customAlphabet(
   "abcdefghijklmnopqrstuvwxyz0123456789",
@@ -46,6 +52,7 @@ export default function LiveSessionPage({
   const [ended, setEnded] = useState(false);
   const [users, setUsers] = useState<LiveUser[]>([]);
   const [dragIndicators, setDragIndicators] = useState<DragIndicator[]>([]);
+  const [vote, setVote] = useState<VoteState | null>(null);
   const isDraggingRef = useRef(false);
   const presenceRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -127,6 +134,10 @@ export default function LiveSessionPage({
       setDragIndicators(indicators);
     });
 
+    const unsubVote = subscribeVote(code, (voteState) => {
+      setVote(voteState);
+    });
+
     // Heartbeat for presence
     updatePresence(code, id, name);
     presenceRef.current = setInterval(() => {
@@ -135,6 +146,7 @@ export default function LiveSessionPage({
 
     return () => {
       unsub();
+      unsubVote();
       if (presenceRef.current) {
         clearInterval(presenceRef.current);
         presenceRef.current = null;
@@ -179,6 +191,35 @@ export default function LiveSessionPage({
     },
     [code, ended, joined, getEffectiveId],
   );
+
+  const handleStartVote = useCallback(
+    (itemId: string, itemTitle: string) => {
+      if (ended) return;
+      startVote(code, itemId, itemTitle);
+    },
+    [code, ended],
+  );
+
+  const handleSubmitVote = useCallback(
+    (tier: string) => {
+      if (ended) return;
+      submitVote(code, getEffectiveId(), tier);
+    },
+    [code, ended, getEffectiveId],
+  );
+
+  const handleResolveVote = useCallback(
+    (result: string) => {
+      if (ended) return;
+      resolveVote(code, result);
+    },
+    [code, ended],
+  );
+
+  const handleClearVote = useCallback(() => {
+    if (ended) return;
+    clearVote(code);
+  }, [code, ended]);
 
   if (!joined) {
     return (
@@ -275,11 +316,20 @@ export default function LiveSessionPage({
           initialData={data}
           canEditTiers={false}
           canSave={false}
+          liveSessionCode={code}
           onItemAdded={handleItemAdded}
           onItemMoved={handleItemMoved}
           onItemRemoved={handleItemRemoved}
           onDragBroadcast={handleDragBroadcast}
           dragIndicators={dragIndicators}
+          vote={vote}
+          currentUserId={effectiveId ?? undefined}
+          totalLiveUsers={users.length}
+          onStartVote={handleStartVote}
+          onSubmitVote={handleSubmitVote}
+          onResolveVote={handleResolveVote}
+          onClearVote={handleClearVote}
+          isHost={false}
         />
       </main>
     </>
