@@ -19,8 +19,8 @@ export function useImageProxy() {
   if (!discordSdk) return (url: string | null) => url;
   return (url: string | null) => {
     if (!url) return null;
-    if (!ORIGIN_WHITELIST.includes(new URL(url).origin)) {
-      return url; // Don't proxy if not in whitelist
+    if (ORIGIN_WHITELIST.includes(new URL(url).origin)) {
+      return url; // Don't proxy if in whitelist
     }
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   };
