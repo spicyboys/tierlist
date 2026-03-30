@@ -42,8 +42,13 @@ service cloud.firestore {
 
         // Only the owner can write tiers
         // getAfter() is needed so batch creates (parent + subcollections) succeed
-        allow create, update, delete: if request.auth != null
+        allow create, update: if request.auth != null
             && getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
+               == /databases/$(database)/documents/users/$(request.auth.uid);
+
+        // get() for deletes so batched parent+subcollection deletes work
+        allow delete: if request.auth != null
+            && get(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
                == /databases/$(database)/documents/users/$(request.auth.uid);
       }
 
@@ -55,11 +60,18 @@ service cloud.firestore {
         // Owner can always write items
         // During a live session, anyone (including guests) can write items
         // getAfter() is needed so batch creates (parent + subcollections) succeed
-        allow create, update, delete: if
+        allow create, update: if
             (request.auth != null
               && getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
                  == /databases/$(database)/documents/users/$(request.auth.uid))
             || getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession != null;
+
+        // get() for deletes so batched parent+subcollection deletes work
+        allow delete: if
+            (request.auth != null
+              && get(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
+                 == /databases/$(database)/documents/users/$(request.auth.uid))
+            || get(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession != null;
       }
     }
 
