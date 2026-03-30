@@ -32,7 +32,13 @@ export default function HomePage() {
       // Handle `live_session_${code}`
       if (discordSdk.customId.startsWith("live_session_")) {
         const code = discordSdk.customId.replace("live_session_", "");
-        router.push(`/live/${code}`);
+        checkLiveSession(code).then((session) => {
+          if (session) {
+            router.push(`/live/${code}`);
+          } else {
+            toast.error("Session not found or has ended");
+          }
+        });
       }
     }
   }, [discordSdk, router]);
