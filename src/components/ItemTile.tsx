@@ -3,6 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TierItem } from "@/lib/types";
+import { useImageProxy } from "./DiscordSDKProvider";
 
 interface ItemTileProps {
   item: TierItem;
@@ -19,6 +20,7 @@ export default function ItemTile({
   overlay,
   draggedBy,
 }: ItemTileProps) {
+  const proxyUrl = useImageProxy();
   const {
     attributes,
     listeners,
@@ -38,7 +40,7 @@ export default function ItemTile({
     <>
       {item.imageUrl ? (
         <img
-          src={item.imageUrl}
+          src={proxyUrl(item.imageUrl)!}
           alt={item.title}
           className="w-full h-full object-cover export-img"
           draggable={false}

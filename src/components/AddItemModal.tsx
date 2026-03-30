@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useImageProxy } from "./DiscordSDKProvider";
 
 interface SearchResult {
   url: string;
@@ -25,6 +26,7 @@ interface AddItemModalProps {
 }
 
 export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
+  const proxyUrl = useImageProxy();
   const [title, setTitle] = useState("");
   const [source, setSource] = useState<ImageSource>("commons");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -87,7 +89,7 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
         setPasteValid(false);
         setSelectedUrl(null);
       };
-      img.src = url.trim();
+      img.src = proxyUrl(url.trim())!;
     }
   };
 
@@ -178,7 +180,7 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
                       title={r.title}
                     >
                       <img
-                        src={r.thumbnail}
+                        src={proxyUrl(r.thumbnail)!}
                         alt={r.title}
                         className="w-full h-full object-cover"
                       />
@@ -210,7 +212,7 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 overflow-hidden border-2 border-green-500 flex-shrink-0">
                   <img
-                    src={pasteUrl.trim()}
+                    src={proxyUrl(pasteUrl.trim())!}
                     alt="Preview"
                     className="w-full h-full object-cover"
                   />

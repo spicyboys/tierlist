@@ -152,7 +152,7 @@ export default function EditorPage({
       if (discordSdk) {
         try {
           await discordSdk.commands.shareLink({
-            message: `Join my live tierlist session! Code: ${code}`,
+            message: `Join my live tierlist session and rank **${data?.title}**! Code: ${code}`,
             custom_id: `live_session_${code}`,
           });
         } catch (e) {

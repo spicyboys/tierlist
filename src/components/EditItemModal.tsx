@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TierItem } from "@/lib/types";
+import { useImageProxy } from "./DiscordSDKProvider";
 
 interface SearchResult {
   url: string;
@@ -27,6 +28,7 @@ interface EditItemModalProps {
 }
 
 export default function EditItemModal({ item, onSave, onClose }: EditItemModalProps) {
+  const proxyUrl = useImageProxy();
   const [title, setTitle] = useState(item.title);
   const [imageUrl, setImageUrl] = useState(item.imageUrl);
   const [source, setSource] = useState<ImageSource>("commons");
@@ -85,7 +87,7 @@ export default function EditItemModal({ item, onSave, onClose }: EditItemModalPr
       img.onerror = () => {
         setPasteValid(false);
       };
-      img.src = url.trim();
+      img.src = proxyUrl(url.trim())!;
     }
   };
 
@@ -105,7 +107,7 @@ export default function EditItemModal({ item, onSave, onClose }: EditItemModalPr
           <div className="flex items-center gap-3 mb-4">
             <div className="w-16 h-16 overflow-hidden border border-gray-600 flex-shrink-0">
               <img
-                src={imageUrl}
+                src={proxyUrl(imageUrl)!}
                 alt={title}
                 className="w-full h-full object-cover"
               />
@@ -196,7 +198,7 @@ export default function EditItemModal({ item, onSave, onClose }: EditItemModalPr
                       title={r.title}
                     >
                       <img
-                        src={r.thumbnail}
+                        src={proxyUrl(r.thumbnail)!}
                         alt={r.title}
                         className="w-full h-full object-cover"
                       />
@@ -228,7 +230,7 @@ export default function EditItemModal({ item, onSave, onClose }: EditItemModalPr
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 overflow-hidden border-2 border-green-500 flex-shrink-0">
                   <img
-                    src={pasteUrl.trim()}
+                    src={proxyUrl(pasteUrl.trim())!}
                     alt="Preview"
                     className="w-full h-full object-cover"
                   />

@@ -26,6 +26,7 @@ import TierRow from "./TierRow";
 import ItemTile from "./ItemTile";
 import AddItemModal from "./AddItemModal";
 import EditItemModal from "./EditItemModal";
+import { useImageProxy } from "./DiscordSDKProvider";
 import toast from "react-hot-toast";
 
 export interface DragIndicator {
@@ -185,6 +186,7 @@ export default function TierListEditor({
   onDragBroadcast,
   dragIndicators,
 }: TierListEditorProps) {
+  const proxyUrl = useImageProxy();
   const [title, setTitle] = useState(initialData.title);
   const [tiers, setTiers] = useState<TierData[]>(initialData.tiers);
   const [unsortedItems, setUnsortedItems] = useState<TierItem[]>(
@@ -789,7 +791,7 @@ export default function TierListEditor({
                 >
                   {rec.imageUrl && (
                     <img
-                      src={rec.imageUrl}
+                      src={proxyUrl(rec.imageUrl)!}
                       alt={rec.title}
                       className="w-8 h-8 object-cover rounded flex-shrink-0"
                     />

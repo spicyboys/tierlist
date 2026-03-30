@@ -9,6 +9,15 @@ export function useDiscordSDK() {
   return use(DiscordSDKContext);
 }
 
+export function useImageProxy() {
+  const discordSdk = use(DiscordSDKContext);
+  if (!discordSdk) return (url: string | null) => url;
+  return (url: string | null) => {
+    if (!url) return null;
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  };
+}
+
 let sdk: DiscordSDK | null = null;
 try {
   sdk = new DiscordSDK(process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!);
