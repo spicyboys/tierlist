@@ -131,7 +131,7 @@ export default function LiveSessionPage({
     updatePresence(code, id, name);
     presenceRef.current = setInterval(() => {
       updatePresence(code, id, name);
-    }, 5000);
+    }, 30 * 1000);
 
     return () => {
       unsub();

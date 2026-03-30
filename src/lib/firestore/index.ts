@@ -488,7 +488,7 @@ export function subscribeLiveSessionUsers(
         liveSessionUsersCol(code),
         (snapshot) => {
             const now = Math.floor(Date.now() / 1000);
-            const TIMEOUT = 15;
+            const TIMEOUT = 60 * 1000;
 
             const users = snapshot.docs
                 .map((d) => ({
