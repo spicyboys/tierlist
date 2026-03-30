@@ -20,7 +20,7 @@ export default function LiveUserBar({
           <span
             key={u.id}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-              u.id === hostUserId
+              u.id === currentUserId
                 ? "bg-purple-900/50 text-purple-300 ring-1 ring-purple-500/30"
                 : u.draggingItemId
                   ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
@@ -34,9 +34,8 @@ export default function LiveUserBar({
             />
 
             {u.username}
-            {u.id === currentUserId && " (you)"}
-            {u.id === hostUserId && " (host)"}
-            {u.draggingItemId && u.id !== hostUserId && " - moving..."}
+            {u.id === hostUserId && <span title="Host">👑</span>}
+            {u.draggingItemId && " - moving..."}
           </span>
         );
       })}
