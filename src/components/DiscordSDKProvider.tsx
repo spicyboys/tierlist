@@ -29,10 +29,16 @@ export function useImageProxy() {
 let sdk: DiscordSDK | null = null;
 try {
   sdk = new DiscordSDK(process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!);
-  patchUrlMappings([
-    { prefix: "/googleapis/{subdomain}", target: "{subdomain}.googleapis.com" },
-    { prefix: "/wikimedia", target: "upload.wikimedia.org" },
-  ]);
+  patchUrlMappings(
+    [
+      {
+        prefix: "/googleapis/{subdomain}",
+        target: "{subdomain}.googleapis.com",
+      },
+      { prefix: "/wikimedia", target: "upload.wikimedia.org" },
+    ],
+    { patchSrcAttributes: true },
+  );
 } catch {
   // Not in a discord environment
 }
