@@ -18,6 +18,7 @@ import {
   setDragState,
 } from "@/lib/firestore";
 import { customAlphabet } from "nanoid";
+import LiveUserBar from "@/components/LiveUserBar";
 
 const generateGuestId = customAlphabet(
   "abcdefghijklmnopqrstuvwxyz0123456789",
@@ -262,32 +263,14 @@ export default function LiveSessionPage({
   return (
     <>
       {users.length > 0 && effectiveId && (
-        <div className="border-b border-gray-800 px-4 py-2 flex items-center gap-2 overflow-x-auto">
-          {users.map((u) => (
-            <span
-              key={u.id}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                u.id === effectiveId
-                  ? "bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/30"
-                  : u.draggingItemId
-                    ? "bg-yellow-900/50 text-yellow-300 ring-1 ring-yellow-500/30"
-                    : "bg-gray-800 text-gray-300"
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  u.draggingItemId ? "bg-yellow-400" : "bg-green-400"
-                }`}
-              />
-              {u.username}
-              {u.id === effectiveId && " (you)"}
-              {u.draggingItemId && u.id !== effectiveId && " - moving..."}
-            </span>
-          ))}
-        </div>
+        <LiveUserBar
+          users={users}
+          hostUserId={data.ownerId || null}
+          currentUserId={effectiveId}
+        />
       )}
 
-      <main className="max-w-2xl mx-auto px-4 py-24 text-center">
+      <main className="max-w-5xl mx-auto px-4 py-24 text-center">
         <TierListEditor
           initialData={data}
           canEditTiers={false}

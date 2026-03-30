@@ -657,7 +657,7 @@ export default function TierListEditor({
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div>
       {/* Header */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <input
