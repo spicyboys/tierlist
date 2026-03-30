@@ -161,17 +161,6 @@ export default function AuthProvider({
     signInWithGoogle();
   }, []);
 
-  if (discordSdk !== null && user === null) {
-    // We have the Discord SDK but no user yet, which means we're in the process
-    // of authenticating with Discord. Show a loading state.
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white gap-4">
-        <div className="w-10 h-10 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
-        <p className="text-gray-400 text-sm">Connecting to Discord...</p>
-      </div>
-    );
-  }
-
   return (
     <UserContext.Provider value={{ user, setDisplayName, signIn }}>
       {children}
