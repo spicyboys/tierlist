@@ -14,11 +14,12 @@ const ORIGIN_WHITELIST = [
   "https://upload.wikimedia.org",
 ];
 
-export function useImageProxy() {
+export function useImageProxy(): (url: string) => string {
   const discordSdk = use(DiscordSDKContext);
-  if (!discordSdk) return (url: string | null) => url;
-  return (url: string | null) => {
-    if (!url) return null;
+
+  if (!discordSdk) return (url: string) => url;
+
+  return (url: string) => {
     if (ORIGIN_WHITELIST.includes(new URL(url).origin)) {
       return url; // Don't proxy if in whitelist
     }

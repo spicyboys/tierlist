@@ -847,7 +847,7 @@ export default function TierListEditor({
                 >
                   {rec.imageUrl && (
                     <img
-                      src={proxyUrl(rec.imageUrl)!}
+                      src={proxyUrl(rec.imageUrl)}
                       alt={rec.title}
                       className="w-8 h-8 object-cover rounded flex-shrink-0"
                     />

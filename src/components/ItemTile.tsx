@@ -40,7 +40,7 @@ export default function ItemTile({
     <>
       {item.imageUrl ? (
         <img
-          src={proxyUrl(item.imageUrl)!}
+          src={proxyUrl(item.imageUrl)}
           alt={item.title}
           className="w-full h-full object-cover export-img"
           draggable={false}

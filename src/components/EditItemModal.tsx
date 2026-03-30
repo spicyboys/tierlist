@@ -91,7 +91,7 @@ export default function EditItemModal({
       img.onerror = () => {
         setPasteValid(false);
       };
-      img.src = proxyUrl(url.trim())!;
+      img.src = proxyUrl(url.trim());
     }
   };
 
@@ -111,7 +111,7 @@ export default function EditItemModal({
           <div className="flex items-center gap-3 mb-4">
             <div className="w-16 h-16 overflow-hidden border border-gray-600 flex-shrink-0">
               <img
-                src={proxyUrl(imageUrl)!}
+                src={proxyUrl(imageUrl)}
                 alt={title}
                 className="w-full h-full object-cover"
               />
@@ -206,7 +206,7 @@ export default function EditItemModal({
                       title={r.title}
                     >
                       <img
-                        src={proxyUrl(r.thumbnail)!}
+                        src={proxyUrl(r.thumbnail)}
                         alt={r.title}
                         className="w-full h-full object-cover"
                       />
@@ -238,7 +238,7 @@ export default function EditItemModal({
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 overflow-hidden border-2 border-green-500 flex-shrink-0">
                   <img
-                    src={proxyUrl(pasteUrl.trim())!}
+                    src={proxyUrl(pasteUrl.trim())}
                     alt="Preview"
                     className="w-full h-full object-cover"
                   />

@@ -89,7 +89,7 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
         setPasteValid(false);
         setSelectedUrl(null);
       };
-      img.src = proxyUrl(url.trim())!;
+      img.src = proxyUrl(url.trim());
     }
   };
 
@@ -182,7 +182,7 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
                       title={r.title}
                     >
                       <img
-                        src={proxyUrl(r.thumbnail)!}
+                        src={proxyUrl(r.thumbnail)}
                         alt={r.title}
                         className="w-full h-full object-cover"
                       />
@@ -214,7 +214,7 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 overflow-hidden border-2 border-green-500 flex-shrink-0">
                   <img
-                    src={proxyUrl(pasteUrl.trim())!}
+                    src={proxyUrl(pasteUrl.trim())}
                     alt="Preview"
                     className="w-full h-full object-cover"
                   />
