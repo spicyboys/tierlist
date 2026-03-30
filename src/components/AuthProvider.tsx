@@ -27,12 +27,14 @@ import { type UserDoc } from "@/lib/firestore/converters/user";
 
 interface UserContextValue {
   user: UserDoc | null;
+  discordAccessToken: string | null;
   setDisplayName: (name: string) => Promise<void>;
   signIn: () => void;
 }
 
 const UserContext = createContext<UserContextValue>({
   user: null,
+  discordAccessToken: null,
   setDisplayName: async () => {},
   signIn: () => {},
 });
@@ -47,6 +49,10 @@ export function useSetDisplayName(): (name: string) => Promise<void> {
 
 export function useSignIn(): () => void {
   return useContext(UserContext).signIn;
+}
+
+export function useDiscordAccessToken(): string | null {
+  return useContext(UserContext).discordAccessToken;
 }
 
 async function userFromDiscord(discordSdk: DiscordSDK) {
@@ -162,7 +168,9 @@ export default function AuthProvider({
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, setDisplayName, signIn }}>
+    <UserContext.Provider
+      value={{ user, setDisplayName, signIn, discordAccessToken }}
+    >
       {children}
     </UserContext.Provider>
   );

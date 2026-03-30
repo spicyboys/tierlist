@@ -26,8 +26,40 @@ import TierRow from "./TierRow";
 import ItemTile from "./ItemTile";
 import AddItemModal from "./AddItemModal";
 import EditItemModal from "./EditItemModal";
-import { useImageProxy } from "./DiscordSDKProvider";
+import { useImageProxy, useDiscordSDK } from "./DiscordSDKProvider";
 import toast from "react-hot-toast";
+import { useDiscordAccessToken } from "./AuthProvider";
+import type { DiscordSDK } from "@discord/embedded-app-sdk";
+
+async function uploadAndShareMoment(
+  canvas: HTMLCanvasElement,
+  filename: string,
+  discordSdk: DiscordSDK,
+  accessToken: string,
+) {
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/png"),
+  );
+  if (!blob) throw new Error("Failed to convert canvas to blob");
+
+  const form = new FormData();
+  form.append("file", blob, filename);
+
+  const uploadRes = await fetch(
+    `https://discord.com/api/v10/applications/${discordSdk.clientId}/attachment`,
+    {
+      method: "POST",
+      body: form,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  if (!uploadRes.ok) throw new Error("Failed to upload image to Discord");
+
+  const {
+    attachment: { url: mediaUrl },
+  } = (await uploadRes.json()) as { attachment: { url: string } };
+  await discordSdk.commands.openShareMomentDialog({ mediaUrl });
+}
 
 export interface DragIndicator {
   itemId: string;
@@ -193,6 +225,8 @@ export default function TierListEditor({
   dragIndicators,
 }: TierListEditorProps) {
   const proxyUrl = useImageProxy();
+  const discordSdk = useDiscordSDK();
+  const discordAccessToken = useDiscordAccessToken();
   const [title, setTitle] = useState(initialData.title);
   const [tiers, setTiers] = useState<TierData[]>(initialData.tiers);
   const [unsortedItems, setUnsortedItems] = useState<TierItem[]>(
@@ -642,12 +676,22 @@ export default function TierListEditor({
 
       document.body.removeChild(clone);
 
-      const link = document.createElement("a");
-      link.download = `${title || "tierlist"}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-      toast.success("Exported as PNG!");
-    } catch {
+      if (discordSdk && discordAccessToken) {
+        await uploadAndShareMoment(
+          canvas,
+          `${title || "tierlist"}.png`,
+          discordSdk,
+          discordAccessToken,
+        );
+      } else {
+        const link = document.createElement("a");
+        link.download = `${title || "tierlist"}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        toast.success("Exported as PNG!");
+      }
+    } catch (error) {
+      console.error("Failed to export:", error);
       // Clean up clone if it's still in the DOM
       document.querySelector("[data-exporting]")?.remove();
       toast.error("Failed to export");
@@ -672,7 +716,11 @@ export default function TierListEditor({
             disabled={exporting}
             className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
           >
-            {exporting ? "Exporting..." : "Export PNG"}
+            {exporting
+              ? "Exporting..."
+              : discordSdk && discordAccessToken
+                ? "Share Image"
+                : "Download Image"}
           </button>
           {canSave && onSave && (
             <button
