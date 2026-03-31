@@ -91,6 +91,7 @@ async function renderTierListToCanvas(
     // html2canvas doesn't support object-fit:cover, so we pre-render each
     // image onto a <canvas> at high resolution with cover-crop. html2canvas
     // copies canvas pixels directly, preserving full quality.
+    const origTiles = element.querySelectorAll<HTMLElement>(".export-tile");
     const origImgs = element.querySelectorAll<HTMLImageElement>(".export-img");
     const cloneImgs = clone.querySelectorAll<HTMLImageElement>(".export-img");
 
@@ -110,11 +111,20 @@ async function renderTierListToCanvas(
 
     cloneImgs.forEach((cloneImg, i) => {
       const srcImg = loadedImages[i];
-      const tile = cloneImg.closest(".export-tile");
-      if (!tile) return;
-      const tileEl = tile as HTMLElement;
-      const tw = tileEl.offsetWidth;
-      const th = tileEl.offsetHeight;
+      // Read tile size from the original DOM element, not the clone,
+      // so responsive sizes are accurate
+      const origTile = origTiles[i];
+      if (!origTile) return;
+      const tw = origTile.offsetWidth;
+      const th = origTile.offsetHeight;
+
+      // Force the clone tile to match the original size
+      const cloneTile = cloneImg.closest(".export-tile") as HTMLElement | null;
+      if (cloneTile) {
+        cloneTile.style.width = `${tw}px`;
+        cloneTile.style.height = `${th}px`;
+      }
+
       const nw = srcImg.naturalWidth || tw;
       const nh = srcImg.naturalHeight || th;
 
@@ -136,7 +146,8 @@ async function renderTierListToCanvas(
           ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, cvs.width, cvs.height);
           cloneImg.parentNode?.replaceChild(cvs, cloneImg);
         } catch {
-          // If drawImage fails (CORS), leave the original img in place
+          // If drawImage fails (CORS), remove the image to avoid tainting the canvas
+          cloneImg.remove();
         }
       }
     });
@@ -146,7 +157,6 @@ async function renderTierListToCanvas(
       backgroundColor: "#1a1a2e",
       scale: renderScale,
       useCORS: true,
-      allowTaint: true,
     });
 
     return canvas;
@@ -731,19 +741,17 @@ export default function TierListEditor({
           </h1>
         )}
         <div className="flex gap-2 flex-shrink-0 flex-wrap">
-          {!readOnly && (
-            <button
-              onClick={handleExportPNG}
-              disabled={exporting}
-              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-            >
-              {exporting
-                ? "Exporting..."
-                : discordSdk && discordAccessToken
-                  ? "Share Image"
-                  : "Download Image"}
-            </button>
-          )}
+          <button
+            onClick={handleExportPNG}
+            disabled={exporting}
+            className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
+            {exporting
+              ? "Exporting..."
+              : discordSdk && discordAccessToken
+                ? "Share Image"
+                : "Download Image"}
+          </button>
           {isOwner && onSave && (
             <button
               onClick={handleSave}
