@@ -11,6 +11,7 @@ interface ItemTileProps {
   onEdit?: () => void;
   overlay?: boolean;
   draggedBy?: string;
+  readOnly?: boolean;
 }
 
 export default function ItemTile({
@@ -19,6 +20,7 @@ export default function ItemTile({
   onEdit,
   overlay,
   draggedBy,
+  readOnly,
 }: ItemTileProps) {
   const proxyUrl = useImageProxy();
   const {
@@ -73,11 +75,11 @@ export default function ItemTile({
       style={style}
       {...attributes}
       {...listeners}
-      className={`export-tile w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] overflow-hidden bg-gray-700 cursor-grab active:cursor-grabbing relative flex-shrink-0 group touch-none ${
+      className={`export-tile w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] overflow-hidden bg-gray-700  relative flex-shrink-0 group touch-none ${
         draggedBy
           ? "border-2 border-yellow-400 ring-1 ring-yellow-400/50 animate-pulse"
           : "border border-gray-900/50 hover:brightness-110 hover:z-10"
-      }`}
+      } ${readOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
     >
       {content}
       {draggedBy && (
@@ -85,7 +87,7 @@ export default function ItemTile({
           {draggedBy}
         </div>
       )}
-      {!draggedBy && (onRemove || onEdit) && (
+      {!readOnly && !draggedBy && (onRemove || onEdit) && (
         <div className="export-hide absolute top-0 right-0 flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
           {onEdit && (
             <button

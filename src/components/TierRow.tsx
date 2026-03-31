@@ -20,6 +20,7 @@ interface TierRowProps {
   isFirst?: boolean;
   isLast?: boolean;
   canEditTiers?: boolean;
+  readOnly?: boolean;
   dragIndicators?: DragIndicator[];
 }
 
@@ -34,6 +35,7 @@ export default function TierRow({
   isFirst,
   isLast,
   canEditTiers = true,
+  readOnly,
   dragIndicators,
 }: TierRowProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `tier-${tier.id}` });
@@ -108,12 +110,11 @@ export default function TierRow({
                 onRemove={
                   onRemoveItem ? () => onRemoveItem(item.id) : undefined
                 }
-                onEdit={
-                  onEditItem ? () => onEditItem(item.id) : undefined
-                }
+                onEdit={onEditItem ? () => onEditItem(item.id) : undefined}
                 draggedBy={
                   dragIndicators?.find((d) => d.itemId === item.id)?.userName
                 }
+                readOnly={readOnly}
               />
             ))}
           </div>

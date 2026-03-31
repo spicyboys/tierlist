@@ -71,6 +71,7 @@ interface TierListEditorProps {
   onSave?: (data: TierListData) => Promise<void>;
   canEditTiers?: boolean;
   canSave?: boolean;
+  readOnly?: boolean;
   onStartLive?: () => void;
   liveSessionCode?: string | null;
   onEndLive?: () => void;
@@ -120,11 +121,13 @@ function UnsortedPool({
   items,
   onRemoveItem,
   onEditItem,
+  readOnly,
   dragIndicators,
 }: {
   items: TierItem[];
   onRemoveItem?: (id: string) => void;
   onEditItem?: (id: string) => void;
+  readOnly?: boolean;
   dragIndicators?: DragIndicator[];
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "unsorted" });
@@ -150,6 +153,7 @@ function UnsortedPool({
               draggedBy={
                 dragIndicators?.find((d) => d.itemId === item.id)?.userName
               }
+              readOnly={readOnly}
             />
           ))}
           {items.length === 0 && (
@@ -215,6 +219,7 @@ export default function TierListEditor({
   onSave,
   canEditTiers = true,
   canSave = true,
+  readOnly = false,
   onStartLive,
   liveSessionCode,
   onEndLive,
@@ -298,6 +303,7 @@ export default function TierListEditor({
       activationConstraint: { delay: 200, tolerance: 5 },
     }),
   );
+  const noSensors = useSensors();
 
   const findItem = useCallback(
     (id: string): { item: TierItem; source: "unsorted" | string } | null => {
@@ -759,7 +765,7 @@ export default function TierListEditor({
 
       {/* Tiers */}
       <DndContext
-        sensors={sensors}
+        sensors={readOnly ? noSensors : sensors}
         collisionDetection={tierListCollision}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -782,6 +788,7 @@ export default function TierListEditor({
               isFirst={idx === 0}
               isLast={idx === tiers.length - 1}
               canEditTiers={canEditTiers}
+              readOnly={readOnly}
               dragIndicators={dragIndicators}
             />
           ))}
@@ -814,6 +821,7 @@ export default function TierListEditor({
             items={unsortedItems}
             onRemoveItem={handleRemoveItem}
             onEditItem={handleEditItem}
+            readOnly={readOnly}
             dragIndicators={dragIndicators}
           />
         </div>

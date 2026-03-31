@@ -253,6 +253,7 @@ export default function LiveSessionPage({
           initialData={data}
           canEditTiers={false}
           canSave={false}
+          readOnly
         />
       </main>
     );
