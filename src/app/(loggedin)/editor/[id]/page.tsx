@@ -190,7 +190,7 @@ export default function EditorPage({
         <TierListEditor
           initialData={data}
           onSave={handleSave}
-          canSave={true}
+          isOwner={true}
           onStartLive={handleStartLive}
           liveSessionCode={liveCode}
           onEndLive={handleEndLive}

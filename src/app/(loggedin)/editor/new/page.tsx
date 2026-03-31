@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import TierListEditor from "@/components/TierListEditor";
-import { TierListData } from "@/lib/types";
 import { useUser } from "@/components/AuthProvider";
 import { createTierList } from "@/lib/firestore";
 import toast from "react-hot-toast";
@@ -17,49 +15,29 @@ const DEFAULT_TIERS = [
   { id: "new-f", label: "F", color: "#7fffff", order: 5, items: [] },
 ];
 
-const BLANK_DATA: TierListData = {
-  id: "",
-  title: "My Tier List",
-  tiers: DEFAULT_TIERS,
-  unsortedItems: [],
-  liveSessionId: null,
-};
-
 export default function NewEditorPage() {
   const router = useRouter();
   const user = useUser();
-  const [saving, setSaving] = useState(false);
+  const creatingRef = useRef(false);
 
-  const handleCreate = async (data: TierListData) => {
-    if (!user) {
-      toast.error("Sign in to create a tier list");
-      return;
-    }
-    setSaving(true);
-    try {
-      const id = await createTierList(
-        user.id,
-        data.title,
-        data.tiers,
-        data.unsortedItems,
-      );
-      toast.success("Created and saved!");
-      router.push(`/editor/${id}`);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to create tier list");
-    } finally {
-      setSaving(false);
-    }
-  };
+  useEffect(() => {
+    if (!user || creatingRef.current) return;
+    creatingRef.current = true;
+
+    createTierList(user.id, "My Tier List", DEFAULT_TIERS)
+      .then((id) => {
+        router.replace(`/editor/${id}`);
+      })
+      .catch((error) => {
+        console.error(error);
+        toast.error("Failed to create tier list");
+        creatingRef.current = false;
+      });
+  }, [user, router]);
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-24 text-center">
-      <TierListEditor
-        initialData={BLANK_DATA}
-        onSave={handleCreate}
-        canSave={!saving}
-      />
-    </main>
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="text-gray-400">Creating tier list...</div>
+    </div>
   );
 }

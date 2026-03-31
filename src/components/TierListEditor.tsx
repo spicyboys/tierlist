@@ -70,7 +70,7 @@ interface TierListEditorProps {
   initialData: TierListData;
   onSave?: (data: TierListData) => Promise<void>;
   canEditTiers?: boolean;
-  canSave?: boolean;
+  isOwner?: boolean;
   readOnly?: boolean;
   onStartLive?: () => void;
   liveSessionCode?: string | null;
@@ -218,7 +218,7 @@ export default function TierListEditor({
   initialData,
   onSave,
   canEditTiers = true,
-  canSave = true,
+  isOwner = true,
   readOnly = false,
   onStartLive,
   liveSessionCode,
@@ -295,7 +295,7 @@ export default function TierListEditor({
       setTiersWrapped(initialData.tiers);
       setUnsortedWrapped(initialData.unsortedItems);
     }
-  }, [initialData]);
+  }, [initialData, setTiersWrapped, setUnsortedWrapped]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -710,25 +710,33 @@ export default function TierListEditor({
     <div>
       {/* Header */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="text-2xl font-bold bg-transparent text-white border-b-2 border-transparent hover:border-gray-600 focus:border-blue-500 outline-none flex-1 min-w-0"
-          placeholder="Tier List Title"
-        />
+        {isOwner ? (
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-2xl font-bold bg-transparent text-white border-b-2 border-transparent hover:border-gray-600 focus:border-blue-500 outline-none flex-1 min-w-0"
+            placeholder="Tier List Title"
+          />
+        ) : (
+          <h1 className="text-2xl font-bold text-white flex-1 min-w-0">
+            {title}
+          </h1>
+        )}
         <div className="flex gap-2 flex-shrink-0 flex-wrap">
-          <button
-            onClick={handleExportPNG}
-            disabled={exporting}
-            className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-          >
-            {exporting
-              ? "Exporting..."
-              : discordSdk && discordAccessToken
-                ? "Share Image"
-                : "Download Image"}
-          </button>
-          {canSave && onSave && (
+          {!readOnly && (
+            <button
+              onClick={handleExportPNG}
+              disabled={exporting}
+              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            >
+              {exporting
+                ? "Exporting..."
+                : discordSdk && discordAccessToken
+                  ? "Share Image"
+                  : "Download Image"}
+            </button>
+          )}
+          {isOwner && onSave && (
             <button
               onClick={handleSave}
               disabled={saving}
@@ -805,79 +813,85 @@ export default function TierListEditor({
         )}
 
         {/* Unsorted pool */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-              Unsorted
-            </h3>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm transition"
-            >
-              + Add Item
-            </button>
+        {!(readOnly && unsortedItems.length === 0) && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                Unsorted
+              </h3>
+              {!readOnly && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm transition"
+                >
+                  + Add Item
+                </button>
+              )}
+            </div>
+            <UnsortedPool
+              items={unsortedItems}
+              onRemoveItem={handleRemoveItem}
+              onEditItem={handleEditItem}
+              readOnly={readOnly}
+              dragIndicators={dragIndicators}
+            />
           </div>
-          <UnsortedPool
-            items={unsortedItems}
-            onRemoveItem={handleRemoveItem}
-            onEditItem={handleEditItem}
-            readOnly={readOnly}
-            dragIndicators={dragIndicators}
-          />
-        </div>
+        )}
 
         {/* Recommended items */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-              Recommended
-            </h3>
-            <button
-              onClick={fetchRecommendations}
-              disabled={recsLoading}
-              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-1.5 rounded text-sm transition"
-            >
-              {recsLoading
-                ? "Loading..."
-                : recsFetched
-                  ? "Refresh"
-                  : "Get Suggestions"}
-            </button>
-          </div>
-          {suggestions.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((rec, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleAddRecommendation(rec)}
-                  className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-2 transition group"
-                  title={`Add "${rec.title}"`}
-                >
-                  {rec.imageUrl && (
-                    <img
-                      src={proxyUrl(rec.imageUrl)}
-                      alt={rec.title}
-                      className="w-8 h-8 object-cover rounded flex-shrink-0"
-                    />
-                  )}
-                  <span className="text-sm text-gray-300 group-hover:text-white">
-                    {rec.title}
-                  </span>
-                  <span className="text-green-400 text-xs">+</span>
-                </button>
-              ))}
+        {!readOnly && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                Recommended
+              </h3>
+              <button
+                onClick={fetchRecommendations}
+                disabled={recsLoading}
+                className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-1.5 rounded text-sm transition"
+              >
+                {recsLoading
+                  ? "Loading..."
+                  : recsFetched
+                    ? "Refresh"
+                    : "Get Suggestions"}
+              </button>
             </div>
-          ) : recsFetched && !recsLoading ? (
-            <p className="text-gray-600 text-sm py-3">
-              No suggestions found. Try changing the tier list title.
-            </p>
-          ) : (
-            <p className="text-gray-600 text-sm py-3">
-              Click &quot;Get Suggestions&quot; to find related items based on
-              the tier list title.
-            </p>
-          )}
-        </div>
+            {suggestions.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((rec, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleAddRecommendation(rec)}
+                    className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-2 transition group"
+                    title={`Add "${rec.title}"`}
+                  >
+                    {rec.imageUrl && (
+                      <img
+                        src={proxyUrl(rec.imageUrl)}
+                        alt={rec.title}
+                        className="w-8 h-8 object-cover rounded flex-shrink-0"
+                      />
+                    )}
+                    <span className="text-sm text-gray-300 group-hover:text-white">
+                      {rec.title}
+                    </span>
+                    <span className="text-green-400 text-xs">+</span>
+                  </button>
+                ))}
+              </div>
+            ) : recsFetched && !recsLoading ? (
+              <p className="text-gray-600 text-sm py-3">
+                No suggestions found. Try changing the tier list title.
+              </p>
+            ) : (
+              <p className="text-gray-600 text-sm py-3">
+                Click &quot;Get Suggestions&quot; to find related items based on
+                the tier list title.
+              </p>
+            )}
+          </div>
+        )}
 
         <DragOverlay>
           {activeItem ? <ItemTile item={activeItem} overlay /> : null}

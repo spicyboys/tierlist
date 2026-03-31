@@ -252,7 +252,7 @@ export default function LiveSessionPage({
         <TierListEditor
           initialData={data}
           canEditTiers={false}
-          canSave={false}
+          isOwner={false}
           readOnly
         />
       </main>
@@ -300,7 +300,7 @@ export default function LiveSessionPage({
         <TierListEditor
           initialData={data}
           canEditTiers={false}
-          canSave={false}
+          isOwner={false}
           onItemAdded={handleItemAdded}
           onItemMoved={handleItemMoved}
           onItemRemoved={handleItemRemoved}
