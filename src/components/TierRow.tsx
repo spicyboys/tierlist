@@ -17,14 +17,10 @@ interface TierRowProps {
   onMoveTierDown?: () => void;
   onRemoveItem?: (itemId: string) => void;
   onEditItem?: (itemId: string) => void;
-  onVoteItem?: (itemId: string) => void;
-  onToggleLockItem?: (itemId: string) => void;
   isFirst?: boolean;
   isLast?: boolean;
   canEditTiers?: boolean;
   dragIndicators?: DragIndicator[];
-  isHost?: boolean;
-  isLive?: boolean;
 }
 
 export default function TierRow({
@@ -35,14 +31,10 @@ export default function TierRow({
   onMoveTierDown,
   onRemoveItem,
   onEditItem,
-  onVoteItem,
-  onToggleLockItem,
   isFirst,
   isLast,
   canEditTiers = true,
   dragIndicators,
-  isHost,
-  isLive,
 }: TierRowProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `tier-${tier.id}` });
 
@@ -119,17 +111,9 @@ export default function TierRow({
                 onEdit={
                   onEditItem ? () => onEditItem(item.id) : undefined
                 }
-                onVote={
-                  onVoteItem ? () => onVoteItem(item.id) : undefined
-                }
-                onToggleLock={
-                  onToggleLockItem ? () => onToggleLockItem(item.id) : undefined
-                }
                 draggedBy={
                   dragIndicators?.find((d) => d.itemId === item.id)?.userName
                 }
-                isHost={isHost}
-                isLive={isLive}
               />
             ))}
           </div>
