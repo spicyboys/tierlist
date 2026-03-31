@@ -440,6 +440,18 @@ export async function moveTierListItem(
     await batch.commit();
 }
 
+export async function editTierListItem(
+    tierlistId: string,
+    itemId: string,
+    title: string,
+    imageUrl: string | null,
+) {
+    await updateDoc(doc(itemsCol(tierlistId), itemId), {
+        title,
+        imageUrl: imageUrl || null,
+    });
+}
+
 export async function removeTierListItem(
     tierlistId: string,
     itemId: string,

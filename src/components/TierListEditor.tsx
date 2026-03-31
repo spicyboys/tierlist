@@ -180,6 +180,7 @@ interface TierListEditorProps {
   liveSessionCode?: string | null;
   onEndLive?: () => void;
   onItemAdded?: (item: TierItem, targetTierId: string | null) => void;
+  onItemEdited?: (item: TierItem) => void;
   onItemMoved?: (
     itemId: string,
     targetTierId: string | null,
@@ -328,6 +329,7 @@ export default function TierListEditor({
   liveSessionCode,
   onEndLive,
   onItemAdded,
+  onItemEdited,
   onItemMoved,
   onItemRemoved,
   onDragBroadcast,
@@ -615,6 +617,7 @@ export default function TierListEditor({
         ),
       })),
     );
+    onItemEdited?.(updatedItem);
   };
 
   const handleAddRecommendation = (rec: {

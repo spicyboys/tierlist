@@ -12,6 +12,7 @@ import {
   subscribeTierList,
   subscribeLiveSessionUsers,
   addTierListItem,
+  editTierListItem,
   moveTierListItem,
   removeTierListItem,
   updatePresence,
@@ -145,6 +146,14 @@ export default function LiveSessionPage({
     async (item: TierItem) => {
       if (ended || !tierlistId) return;
       await addTierListItem(tierlistId, item.title, item.imageUrl);
+    },
+    [tierlistId, ended],
+  );
+
+  const handleItemEdited = useCallback(
+    async (item: TierItem) => {
+      if (ended || !tierlistId) return;
+      await editTierListItem(tierlistId, item.id, item.title, item.imageUrl);
     },
     [tierlistId, ended],
   );
@@ -302,6 +311,7 @@ export default function LiveSessionPage({
           canEditTiers={false}
           isOwner={false}
           onItemAdded={handleItemAdded}
+          onItemEdited={handleItemEdited}
           onItemMoved={handleItemMoved}
           onItemRemoved={handleItemRemoved}
           onDragBroadcast={handleDragBroadcast}

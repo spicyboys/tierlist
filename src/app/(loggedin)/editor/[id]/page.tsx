@@ -13,6 +13,7 @@ import {
   createLiveSession,
   endLiveSession,
   addTierListItem,
+  editTierListItem,
   moveTierListItem,
   removeTierListItem,
   subscribeLiveSessionUsers,
@@ -138,6 +139,14 @@ export default function EditorPage({
     [liveCode, id],
   );
 
+  const handleLiveItemEdited = useCallback(
+    async (item: { id: string; title: string; imageUrl: string | null }) => {
+      if (!liveCode) return;
+      await editTierListItem(id, item.id, item.title, item.imageUrl);
+    },
+    [liveCode, id],
+  );
+
   const handleLiveItemMoved = useCallback(
     async (itemId: string, targetTierId: string | null, newOrder: number) => {
       if (!liveCode) return;
@@ -196,6 +205,7 @@ export default function EditorPage({
           onEndLive={handleEndLive}
           onItemMoved={liveCode ? handleLiveItemMoved : undefined}
           onItemAdded={liveCode ? handleLiveItemAdded : undefined}
+          onItemEdited={liveCode ? handleLiveItemEdited : undefined}
           onItemRemoved={liveCode ? handleLiveItemRemoved : undefined}
           onDragBroadcast={liveCode ? handleLiveDragBroadcast : undefined}
           dragIndicators={liveCode ? dragIndicators : undefined}
