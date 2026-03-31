@@ -83,6 +83,9 @@ export default function LiveSessionPage({
         return;
       }
       setTierlistId(session.tierlistId);
+      if (!session.active) {
+        setEnded(true);
+      }
       setLoading(false);
     });
   }, [code, router]);
@@ -92,15 +95,11 @@ export default function LiveSessionPage({
     if (!tierlistId) return;
     const unsub = subscribeTierList(tierlistId, (tierListData) => {
       if (!tierListData) {
-        toast.error("Session ended");
-        setEnded(true);
         return;
       }
-      // Check if live session was removed
-      if (!tierListData.liveSessionId) {
-        toast.error("Session ended");
+      // Check if live session became inactive
+      if (tierListData.liveSession && !tierListData.liveSession.active) {
         setEnded(true);
-        return;
       }
       if (!isDraggingRef.current) {
         setData(tierListData);
@@ -111,12 +110,12 @@ export default function LiveSessionPage({
 
   // Subscribe to live session users
   useEffect(() => {
-    if (!joined) return;
+    if (!joined || !tierlistId || ended) return;
 
     const id = getEffectiveId();
     const name = effectiveName;
 
-    const unsub = subscribeLiveSessionUsers(code, (liveUsers) => {
+    const unsub = subscribeLiveSessionUsers(tierlistId, (liveUsers) => {
       setUsers(liveUsers);
       const indicators: DragIndicator[] = [];
       for (const u of liveUsers) {
@@ -128,9 +127,9 @@ export default function LiveSessionPage({
     });
 
     // Heartbeat for presence
-    updatePresence(code, id, name);
+    updatePresence(tierlistId, id, name);
     presenceRef.current = setInterval(() => {
-      updatePresence(code, id, name);
+      updatePresence(tierlistId, id, name);
     }, 30 * 1000);
 
     return () => {
@@ -140,7 +139,7 @@ export default function LiveSessionPage({
         presenceRef.current = null;
       }
     };
-  }, [code, joined, effectiveName, getEffectiveId]);
+  }, [tierlistId, joined, ended, effectiveName, getEffectiveId]);
 
   const handleItemAdded = useCallback(
     async (item: TierItem) => {
@@ -173,11 +172,11 @@ export default function LiveSessionPage({
 
   const handleDragBroadcast = useCallback(
     (itemId: string | null) => {
-      if (ended || !joined) return;
+      if (ended || !joined || !tierlistId) return;
       isDraggingRef.current = !!itemId;
-      setDragState(code, getEffectiveId(), itemId);
+      setDragState(tierlistId, getEffectiveId(), itemId);
     },
-    [code, ended, joined, getEffectiveId],
+    [tierlistId, ended, joined, getEffectiveId],
   );
 
   if (!joined) {
@@ -230,6 +229,32 @@ export default function LiveSessionPage({
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (ended && data) {
+    return (
+      <main className="max-w-5xl mx-auto px-4 py-24 text-center">
+        <div className="mb-6 bg-gray-900 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <span className="text-yellow-400 font-medium">Session Ended</span>
+            <span className="text-gray-500 ml-2 text-sm">
+              This session is no longer active.
+            </span>
+          </div>
+          <Link
+            href="/"
+            className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition"
+          >
+            Go Home
+          </Link>
+        </div>
+        <TierListEditor
+          initialData={data}
+          canEditTiers={false}
+          canSave={false}
+        />
+      </main>
     );
   }
 

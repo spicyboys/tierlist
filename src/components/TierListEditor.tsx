@@ -576,7 +576,7 @@ export default function TierListEditor({
           ...item,
           order: i,
         })),
-        liveSessionId: initialData.liveSessionId,
+        liveSession: initialData.liveSession,
       });
       toast.success("Tier list saved!");
     } catch {

@@ -5,10 +5,16 @@ import {
   type DocumentReference,
 } from "firebase/firestore";
 
+export interface TierlistLiveSession {
+  code: string;
+  active: boolean;
+  discordGuildId: string | null;
+}
+
 export interface TierlistDoc {
   title: string;
   owner: DocumentReference;
-  liveSession: DocumentReference | null;
+  liveSession: TierlistLiveSession | null;
 }
 
 export const tierlistConverter: FirestoreDataConverter<TierlistDoc> = {

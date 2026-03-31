@@ -23,7 +23,7 @@ import { customAlphabet } from "nanoid";
 import { tierlistConverter, type TierlistDoc } from "./converters/tierlist";
 import { tierlistTierConverter, type TierlistTierDoc } from "./converters/tierlist-tier";
 import { tierlistItemConverter, type TierlistItemDoc } from "./converters/tierlist-item";
-import { liveSessionConverter, liveSessionUserConverter } from "./converters/live-session";
+import { liveSessionUserConverter } from "./converters/live-session";
 import { userConverter, type UserDoc } from "./converters/user";
 
 const generateId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 25);
@@ -43,12 +43,8 @@ function itemsCol(tierlistId: string) {
     return collection(doc(db, "tierlists", tierlistId), "items").withConverter(tierlistItemConverter);
 }
 
-function liveSessionDoc(code: string) {
-    return doc(db, "liveSessions", code).withConverter(liveSessionConverter);
-}
-
-function liveSessionUsersCol(code: string) {
-    return collection(db, "liveSessions", code, "users").withConverter(liveSessionUserConverter);
+function liveUsersCol(tierlistId: string) {
+    return collection(doc(db, "tierlists", tierlistId), "liveUsers").withConverter(liveSessionUserConverter);
 }
 
 function userDoc(uid: string) {
@@ -201,13 +197,15 @@ export async function saveTierList(
 export async function deleteTierList(id: string) {
     const batch = writeBatch(db);
 
-    const [tiers, items] = await Promise.all([
+    const [tiers, items, liveUsers] = await Promise.all([
         getDocs(tiersCol(id)),
         getDocs(itemsCol(id)),
+        getDocs(liveUsersCol(id)),
     ]);
 
     for (const d of tiers.docs) batch.delete(d.ref);
     for (const d of items.docs) batch.delete(d.ref);
+    for (const d of liveUsers.docs) batch.delete(d.ref);
     batch.delete(doc(db, "tierlists", id));
 
     await batch.commit();
@@ -302,7 +300,9 @@ export function subscribeTierList(
                 title: tierlistData.title,
                 tiers,
                 unsortedItems,
-                liveSessionId: tierlistData.liveSession?.id ?? null,
+                liveSession: tierlistData.liveSession
+                    ? { code: tierlistData.liveSession.code, active: tierlistData.liveSession.active }
+                    : null,
             });
         }, 50);
     }
@@ -338,40 +338,45 @@ export async function createLiveSession(
 ): Promise<string> {
     const code = generateCode();
     const tlRef = doc(db, "tierlists", tierlistId);
-    await setDoc(liveSessionDoc(code), {
-        tierlist: tlRef,
-        discordGuildId,
-    });
 
-    // Mark the tierlist as having an active live session
     await updateDoc(tlRef, {
-        liveSession: doc(db, "liveSessions", code),
+        liveSession: {
+            code,
+            active: true,
+            discordGuildId,
+        },
     });
 
     return code;
 }
 
-export async function endLiveSession(code: string, tierlistId: string) {
-    const batch = writeBatch(db);
+export async function endLiveSession(tierlistId: string) {
+    const tlRef = doc(db, "tierlists", tierlistId);
+    const tlSnap = await getDoc(tierlistDoc(tierlistId));
+    if (!tlSnap.exists()) return;
+    const data = tlSnap.data()!;
+    if (!data.liveSession) return;
 
-    const usersSnapshot = await getDocs(liveSessionUsersCol(code));
-    for (const d of usersSnapshot.docs) batch.delete(d.ref);
-
-    batch.delete(doc(db, "liveSessions", code));
-    batch.update(doc(db, "tierlists", tierlistId), { liveSession: null });
-
-    await batch.commit();
+    await updateDoc(tlRef, {
+        "liveSession.active": false,
+    });
 }
 
 export async function checkLiveSession(
     code: string,
-): Promise<{ tierlistId: string; discordGuildId: string | null } | null> {
-    const snapshot = await getDoc(liveSessionDoc(code));
-    if (!snapshot.exists()) return null;
-    const data = snapshot.data()!;
+): Promise<{ tierlistId: string; active: boolean; discordGuildId: string | null } | null> {
+    const q = query(
+        collection(db, "tierlists").withConverter(tierlistConverter),
+        where("liveSession.code", "==", code),
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const d = snapshot.docs[0];
+    const data = d.data();
     return {
-        tierlistId: data.tierlist.id,
-        discordGuildId: data.discordGuildId,
+        tierlistId: d.id,
+        active: data.liveSession!.active,
+        discordGuildId: data.liveSession!.discordGuildId,
     };
 }
 
@@ -445,12 +450,12 @@ export async function removeTierListItem(
 // ── Live Session Presence ──────────────────────────────────────────────
 
 export async function updatePresence(
-    code: string,
+    tierlistId: string,
     userId: string,
     username: string,
 ) {
     await setDoc(
-        doc(liveSessionUsersCol(code), userId),
+        doc(liveUsersCol(tierlistId), userId),
         {
             username,
             lastSeenAt: Timestamp.fromMillis(Date.now()),
@@ -460,12 +465,12 @@ export async function updatePresence(
 }
 
 export async function setDragState(
-    code: string,
+    tierlistId: string,
     userId: string,
     itemId: string | null,
 ) {
     await setDoc(
-        doc(liveSessionUsersCol(code), userId),
+        doc(liveUsersCol(tierlistId), userId),
         {
             draggingItemId: itemId || null,
             lastSeenAt: Timestamp.fromMillis(Date.now()),
@@ -475,7 +480,7 @@ export async function setDragState(
 }
 
 export function subscribeLiveSessionUsers(
-    code: string,
+    tierlistId: string,
     callback: (
         users: Array<{
             id: string;
@@ -485,7 +490,7 @@ export function subscribeLiveSessionUsers(
     ) => void,
 ): Unsubscribe {
     return onSnapshot(
-        liveSessionUsersCol(code),
+        liveUsersCol(tierlistId),
         (snapshot) => {
             const now = Math.floor(Date.now() / 1000);
             const TIMEOUT = 60;
@@ -509,23 +514,19 @@ export function subscribeGuildSessions(
     callback: (sessions: Array<{ code: string; title: string }>) => void,
 ): Unsubscribe {
     const q = query(
-        collection(db, "liveSessions").withConverter(liveSessionConverter),
-        where("discordGuildId", "==", guildId),
+        collection(db, "tierlists").withConverter(tierlistConverter),
+        where("liveSession.discordGuildId", "==", guildId),
+        where("liveSession.active", "==", true),
     );
 
-    return onSnapshot(q, async (snapshot) => {
-        const sessions = await Promise.all(
-            snapshot.docs.map(async (d) => {
-                const data = d.data();
-                const tlDoc = await getDoc(tierlistDoc(data.tierlist.id));
-                return {
-                    code: d.id,
-                    title: tlDoc.exists()
-                        ? tlDoc.data()!.title
-                        : "Unknown",
-                };
-            }),
-        );
+    return onSnapshot(q, (snapshot) => {
+        const sessions = snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+                code: data.liveSession!.code,
+                title: data.title,
+            };
+        });
         callback(sessions);
     });
 }

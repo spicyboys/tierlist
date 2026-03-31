@@ -54,49 +54,32 @@ service cloud.firestore {
         allow read: if true;
 
         // Owner can always write items
-        // During a live session, anyone (including guests) can write items
+        // During an active live session, anyone (including guests) can write items
         // getAfter() is needed so batch creates (parent + subcollections) succeed
         allow create, update: if
             (request.auth != null
               && getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
                  == /databases/$(database)/documents/users/$(request.auth.uid))
-            || getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession != null;
+            || getAfter(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession.active == true;
 
         // get() for deletes so batched parent+subcollection deletes work
         allow delete: if
             (request.auth != null
               && get(/databases/$(database)/documents/tierlists/$(tierlistId)).data.owner
                  == /databases/$(database)/documents/users/$(request.auth.uid))
-            || get(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession != null;
+            || get(/databases/$(database)/documents/tierlists/$(tierlistId)).data.liveSession.active == true;
       }
-    }
 
-    // ── Live Sessions ────────────────────────────────────────────────
-    match /liveSessions/{code} {
-      // Anyone can read (to check/join a session)
-      allow read: if true;
-
-      // Only the owner of the linked tierlist can create a live session
-      // request.resource.data.tierlist is a reference like /tierlists/{id}
-      allow create: if request.auth != null
-          && get(request.resource.data.tierlist).data.owner
-             == /databases/$(database)/documents/users/$(request.auth.uid);
-
-      // Only the owner of the linked tierlist can delete a live session
-      allow delete: if request.auth != null
-          && get(resource.data.tierlist).data.owner
-             == /databases/$(database)/documents/users/$(request.auth.uid);
-
-      // ── Presence subcollection ───────────────────────────────────
-      match /users/{odOrGuestId} {
+      // ── Live Users subcollection (presence) ──────────────────────
+      match /liveUsers/{idOrGuestId} {
         // Anyone can read presence (needed to see who's in the session)
         allow read: if true;
 
         // Authenticated users can write their own presence doc
         // Guests (unauthenticated) can write docs with a guest_ prefix
         allow create, update: if
-            (request.auth != null && request.auth.uid == odOrGuestId)
-            || (request.auth == null && odOrGuestId.matches('guest_.*'));
+            (request.auth != null && request.auth.uid == idOrGuestId)
+            || (request.auth == null && idOrGuestId.matches('guest_.*'));
 
         // Authenticated users can delete any presence doc (needed to clean up when ending a session)
         allow delete: if request.auth != null;

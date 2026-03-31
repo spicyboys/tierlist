@@ -49,7 +49,9 @@ export default function EditorPage({
       if (!isDraggingRef.current) {
         setData(tierListData);
       }
-      setLiveCode(tierListData.liveSessionId);
+      setLiveCode(
+        tierListData.liveSession?.active ? tierListData.liveSession.code : null,
+      );
     });
     return unsub;
   }, [id, router]);
@@ -66,7 +68,7 @@ export default function EditorPage({
   useEffect(() => {
     if (!liveCode || !user) return;
 
-    const unsub = subscribeLiveSessionUsers(liveCode, (users) => {
+    const unsub = subscribeLiveSessionUsers(id, (users) => {
       setLiveUsers(users);
       const indicators: DragIndicator[] = [];
       for (const u of users) {
@@ -78,9 +80,9 @@ export default function EditorPage({
     });
 
     // Heartbeat for presence
-    updatePresence(liveCode, user.id, user.name);
+    updatePresence(id, user.id, user.name);
     presenceRef.current = setInterval(() => {
-      if (liveCode) updatePresence(liveCode, user.id, user.name);
+      if (liveCode) updatePresence(id, user.id, user.name);
     }, 5000);
 
     return () => {
@@ -90,7 +92,7 @@ export default function EditorPage({
         presenceRef.current = null;
       }
     };
-  }, [liveCode, user]);
+  }, [liveCode, user, id]);
 
   const handleSave = async (saveData: TierListData) => {
     if (!user) return;
@@ -123,9 +125,7 @@ export default function EditorPage({
   };
 
   const handleEndLive = async () => {
-    if (liveCode) {
-      await endLiveSession(liveCode, id);
-    }
+    await endLiveSession(id);
     setLiveCode(null);
     toast.success("Live session ended");
   };
@@ -162,10 +162,10 @@ export default function EditorPage({
   const handleLiveDragBroadcast = useCallback(
     (itemId: string | null) => {
       if (!liveCode || !user) return;
-      setDragState(liveCode, user.id, itemId);
+      setDragState(id, user.id, itemId);
       isDraggingRef.current = !!itemId;
     },
-    [liveCode, user],
+    [liveCode, user, id],
   );
 
   if (!data) {

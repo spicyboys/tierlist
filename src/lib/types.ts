@@ -13,11 +13,16 @@ export interface TierData {
   items: TierItem[];
 }
 
+export interface LiveSessionInfo {
+  code: string;
+  active: boolean;
+}
+
 export interface TierListData {
   id: string;
   ownerId?: string;
   title: string;
   tiers: TierData[];
   unsortedItems: TierItem[];
-  liveSessionId: string | null;
+  liveSession: LiveSessionInfo | null;
 }

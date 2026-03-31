@@ -21,7 +21,7 @@ export default function HomePage() {
     if (session) {
       router.push(`/live/${code}`);
     } else {
-      toast.error("Session not found or has ended");
+      toast.error("Session not found");
     }
   };
 
@@ -36,7 +36,7 @@ export default function HomePage() {
           if (session) {
             router.push(`/live/${code}`);
           } else {
-            toast.error("Session not found or has ended");
+            toast.error("Session not found");
           }
         });
       }

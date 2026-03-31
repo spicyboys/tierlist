@@ -2,33 +2,8 @@ import {
   type SnapshotOptions,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
-  type DocumentReference,
   Timestamp,
 } from "firebase/firestore";
-
-export interface LiveSessionDoc {
-  tierlist: DocumentReference;
-  discordGuildId: string | null;
-}
-
-export const liveSessionConverter: FirestoreDataConverter<LiveSessionDoc> = {
-  toFirestore(session: LiveSessionDoc) {
-    return {
-      tierlist: session.tierlist,
-      discordGuildId: session.discordGuildId,
-    };
-  },
-  fromFirestore(
-    snapshot: QueryDocumentSnapshot,
-    options?: SnapshotOptions,
-  ): LiveSessionDoc {
-    const data = snapshot.data(options);
-    return {
-      tierlist: data.tierlist,
-      discordGuildId: data.discordGuildId ?? null,
-    };
-  },
-};
 
 export interface LiveSessionUserDoc {
   username: string;
