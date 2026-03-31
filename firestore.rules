@@ -22,10 +22,6 @@ service cloud.firestore {
             && request.resource.data.owner == /databases/$(database)/documents/users/$(request.auth.uid);
       }
 
-      function hasActiveLiveSession() {
-        return resource.data.liveSession != null;
-      }
-
       // Anyone can read a tierlist (needed for live session guests)
       allow read: if true;
 
