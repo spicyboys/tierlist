@@ -95,7 +95,8 @@ export default function AddItemModal({ onAdd, onClose }: AddItemModalProps) {
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    onAdd(title.trim(), selectedUrl);
+    const normalized = title.trim().replace(/\b\w/g, (c) => c.toUpperCase());
+    onAdd(normalized, selectedUrl);
     onClose();
   };
 
