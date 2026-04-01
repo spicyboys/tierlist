@@ -161,9 +161,14 @@ export default function AuthProvider({
   }, [discordSdk, user]);
 
   // Authenticate with the Discord SDK whenever we get a new access token
+  const discordAccessTokenRef = useRef<string | null>(null);
   useEffect(() => {
     if (!discordSdk) return;
     if (!discordAccessToken) return;
+
+    // Avoid re-authenticating if the token hasn't changed (can happen on initial load)
+    if (discordAccessTokenRef.current === discordAccessToken) return;
+    discordAccessTokenRef.current = discordAccessToken;
 
     discordSdk.commands
       .authenticate({
