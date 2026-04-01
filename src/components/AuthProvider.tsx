@@ -21,9 +21,10 @@ import {
   updateUserDisplayName,
 } from "@/lib/firestore";
 import { deleteSessionCookie, setSessionCookie } from "@/lib/session";
-import { type DiscordSDK } from "@discord/embedded-app-sdk";
+import { RPCCloseCodes, type DiscordSDK } from "@discord/embedded-app-sdk";
 import { useDiscordSDK } from "./DiscordSDKProvider";
 import { type UserDoc } from "@/lib/firestore/converters/user";
+import LoadingScreen from "./LoadingScreen";
 
 interface UserContextValue {
   user: UserDoc | null;
@@ -99,6 +100,7 @@ export default function AuthProvider({
 }) {
   const discordSdk = useDiscordSDK();
   const [user, setUser] = useState(initialUser);
+  const [loading, setLoading] = useState(!initialUser);
   const [discordAccessToken, setDiscordAccessToken] = useState(
     initialDiscordAccessToken,
   );
@@ -134,6 +136,12 @@ export default function AuthProvider({
         await deleteSessionCookie();
         setUser(null);
       }
+
+      // In non-Discord mode, auth is settled after the first callback.
+      // In Discord mode, we wait until discordSdk.commands.authenticate finishes.
+      if (!discordSdk) {
+        setLoading(false);
+      }
     });
   }, [discordSdk]);
 
@@ -146,7 +154,10 @@ export default function AuthProvider({
     // Avoid re-entrant calls to this effect
     discordAuthStarted.current = true;
 
-    userFromDiscord(discordSdk);
+    userFromDiscord(discordSdk).catch(() => {
+      discordSdk.close(RPCCloseCodes.CLOSE_ABNORMAL, "Authentication failed");
+      setLoading(false);
+    });
   }, [discordSdk, user]);
 
   // Authenticate with the Discord SDK whenever we get a new access token
@@ -154,9 +165,11 @@ export default function AuthProvider({
     if (!discordSdk) return;
     if (!discordAccessToken) return;
 
-    discordSdk.commands.authenticate({
-      access_token: discordAccessToken,
-    });
+    discordSdk.commands
+      .authenticate({
+        access_token: discordAccessToken,
+      })
+      .finally(() => setLoading(false));
   }, [discordSdk, discordAccessToken]);
 
   const setDisplayName = useCallback(
@@ -176,7 +189,7 @@ export default function AuthProvider({
     <UserContext.Provider
       value={{ user, setDisplayName, signIn, discordAccessToken }}
     >
-      {children}
+      {loading ? <LoadingScreen /> : children}
     </UserContext.Provider>
   );
 }
