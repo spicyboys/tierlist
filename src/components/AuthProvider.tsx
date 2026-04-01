@@ -62,7 +62,12 @@ async function userFromDiscord(discordSdk: DiscordSDK) {
     response_type: "code",
     state: "",
     prompt: "none",
-    scope: ["identify", "applications.commands", "email"],
+    scope: [
+      "identify",
+      "applications.commands",
+      "email",
+      "rpc.activities.write",
+    ],
   });
 
   const response = await fetch("/api/auth/discord", {
