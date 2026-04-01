@@ -83,8 +83,7 @@ export async function updateUserDisplayName(uid: string, name: string) {
 export async function createTierList(
     userId: string,
     title: string,
-    tiers: TierData[],
-    unsortedItems: TierItem[] = [],
+    tiers: readonly Omit<TierData, "id">[],
 ): Promise<string> {
     const id = generateId();
     const batch = writeBatch(db);
@@ -118,16 +117,6 @@ export async function createTierList(
                 tier: tierRef,
             });
         }
-    }
-
-    for (const item of unsortedItems) {
-        const itemRef = doc(itemsCollection);
-        batch.set(itemRef, {
-            title: item.title,
-            imageUrl: item.imageUrl || null,
-            order: item.order,
-            tier: null,
-        });
     }
 
     await batch.commit();
