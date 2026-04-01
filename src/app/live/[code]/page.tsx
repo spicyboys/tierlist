@@ -20,6 +20,7 @@ import {
 } from "@/lib/firestore";
 import { customAlphabet } from "nanoid";
 import LiveUserBar from "@/components/LiveUserBar";
+import { useDiscordSDK } from "@/components/DiscordSDKProvider";
 
 const generateGuestId = customAlphabet(
   "abcdefghijklmnopqrstuvwxyz0123456789",
@@ -187,6 +188,20 @@ export default function LiveSessionPage({
     },
     [tierlistId, ended, joined, getEffectiveId],
   );
+
+  const discordSdk = useDiscordSDK();
+  useEffect(() => {
+    if (!discordSdk) return;
+    if (!data) return;
+
+    discordSdk.commands.setActivity({
+      activity: {
+        type: 4,
+        state: "Ranking",
+        details: data.title,
+      },
+    });
+  }, [discordSdk, data]);
 
   if (!joined) {
     return (
