@@ -258,7 +258,7 @@ export default function LiveSessionPage({
 
   if (ended && data) {
     return (
-      <main className="max-w-5xl mx-auto px-4 py-24 text-center">
+      <main className="max-w-5xl mx-auto px-4 pt-4 pb-20 text-center">
         <div className="mb-6 bg-gray-900 rounded-lg p-4 flex items-center justify-between">
           <div>
             <span className="text-yellow-400 font-medium">Session Ended</span>
@@ -320,7 +320,7 @@ export default function LiveSessionPage({
         />
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-24 text-center">
+      <main className="max-w-5xl mx-auto px-4 pt-4 pb-20 text-center">
         <TierListEditor
           initialData={data}
           canEditTiers={false}

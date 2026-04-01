@@ -195,7 +195,7 @@ export default function EditorPage({
         />
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-24 text-center">
+      <main className="max-w-5xl mx-auto px-4 pt-4 pb-20 text-center">
         <TierListEditor
           initialData={data}
           onSave={handleSave}
