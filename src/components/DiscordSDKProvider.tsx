@@ -1,7 +1,7 @@
 "use client";
 
 import { DiscordSDK, patchUrlMappings } from "@discord/embedded-app-sdk";
-import { createContext, use } from "react";
+import { createContext, use, useEffect } from "react";
 
 const DiscordSDKContext = createContext<DiscordSDK | null>(null);
 
@@ -49,6 +49,14 @@ export default function DiscordSDKProvider({
 }: {
   children: React.ReactNode;
 }) {
+  useEffect(() => {
+    if (!sdk) return;
+
+    sdk.commands.setConfig({
+      use_interactive_pip: false,
+    });
+  }, []);
+
   return (
     <DiscordSDKContext.Provider value={sdk}>
       {children}
