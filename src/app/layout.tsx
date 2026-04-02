@@ -4,6 +4,7 @@ import "./globals.css";
 import Providers from "./providers";
 import { getAuthenticatedAppForUser } from "@/lib/firebase/server";
 import PageHeader from "@/components/PageHeader";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -43,6 +44,7 @@ export default async function RootLayout({
             {children}
           </div>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
