@@ -192,16 +192,16 @@ export default function LiveSessionPage({
   const discordSdk = useDiscordSDK();
   useEffect(() => {
     if (!discordSdk) return;
-    if (!data) return;
+    if (!data?.title) return;
 
     discordSdk.commands.setActivity({
       activity: {
-        type: 4,
-        state: "Ranking",
-        details: data.title,
+        type: 0,
+        details: "Ranking items in a tier list",
+        state: data.title,
       },
     });
-  }, [discordSdk, data]);
+  }, [discordSdk, data?.title]);
 
   if (!joined) {
     return (
