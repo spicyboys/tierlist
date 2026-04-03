@@ -16,8 +16,6 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@opentelemetry/api": "^1.9.1",
     "@vercel/analytics": "^2.0.1",
-    "cookies-next": "^6.1.1",
-    "drizzle-orm": "^0.45.1",
     "firebase": "^12.11.0",
     "firebase-admin": "^13.7.0",
     "html2canvas": "^1.4.1",
@@ -28,12 +26,10 @@
     "react-hot-toast": "^2.6.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260317.1",
     "@playwright/test": "^1.58.2",
     "@types/node": "^20.19.37",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
